@@ -1,4 +1,4 @@
-package ke.chama.auth_service;
+package ke.chama.auth;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

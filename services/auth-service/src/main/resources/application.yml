@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: auth-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:15432/chama_auth   # ← 15432
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  data:
+    redis:
+      host: localhost
+      port: 16379                                        # ← 16379
+
+  rabbitmq:
+    host: localhost
+    port: 15673                                          # ← 15673
+    username: guest
+    password: guest
+
+jwt:
+  secret: "chama-auth-secret-key-minimum-256-bits-long-change-in-production"
+  access-token-expiry-ms: 900000
+  refresh-token-expiry-ms: 604800000
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

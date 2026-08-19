@@ -6,3 +6,4 @@ CREATE DATABASE chama_loans;
 CREATE DATABASE chama_penalties;
 CREATE DATABASE chama_investments;
 CREATE DATABASE chama_transactions;
+CREATE DATABASE chama_db;

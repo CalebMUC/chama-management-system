@@ -1,4 +1,4 @@
-package ke.Chama.modules.auth.domain.model;
+package ke.chama.modules.auth.domain.model;
 
 
 import jakarta.persistence.*;

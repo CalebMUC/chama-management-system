@@ -1,4 +1,4 @@
-package ke.Chama;
+package ke.chama;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

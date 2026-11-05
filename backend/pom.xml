@@ -56,6 +56,12 @@
 			<artifactId>spring-modulith-starter-jdbc</artifactId>
 		</dependency>
 
+		<!-- Transactional email (verification, password reset) via SMTP -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<!-- JWT issuing (NimbusJwtEncoder) and validation (bearer-token resource server) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

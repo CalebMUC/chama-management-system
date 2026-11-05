@@ -16,5 +16,7 @@ public enum ErrorType {
     /** Clashes with existing state, e.g. a duplicate M-Pesa reference. HTTP 409. */
     CONFLICT,
     /** Valid request that breaks a business rule, e.g. loan exceeds 3x savings. HTTP 422. */
-    BUSINESS_RULE
+    BUSINESS_RULE,
+    /** Throttled, e.g. too many failed logins. HTTP 429, with Retry-After when known. */
+    TOO_MANY_REQUESTS
 }

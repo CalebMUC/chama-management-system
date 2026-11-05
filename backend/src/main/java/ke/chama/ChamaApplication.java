@@ -3,6 +3,7 @@ package ke.chama;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -18,6 +19,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @ConfigurationPropertiesScan   // Binds @ConfigurationProperties records such as AuthProperties
 @EnableScheduling              // Required for @Scheduled jobs (contribution cycles, token cleanup)
+@EnableAsync                   // @ApplicationModuleListener runs async, so emails never slow down a request
 public class ChamaApplication {
 
 	public static void main(String[] args) {

@@ -49,6 +49,14 @@ public class User extends AggregateRoot {
     @Column(name = "is_enabled", nullable = false)
     private boolean isEnabled = true;
 
+    /** Set when the user proves they own the email (verification link or password reset link). */
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    /** Last password change. Failed logins before this moment no longer count toward lockout. */
+    @Column(name = "password_changed_at")
+    private Instant passwordChangedAt;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
@@ -103,8 +111,37 @@ public class User extends AggregateRoot {
         return email;
     }
 
+    /** A new address is unproven, so changing the email clears verification. */
     public void setEmail(String email) {
-        this.email = normalizeEmail(email);
+        String normalized = normalizeEmail(email);
+        if (!normalized.equals(this.email)) {
+            this.emailVerifiedAt = null;
+        }
+        this.email = normalized;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void markEmailVerified(Instant now) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = now;
+        }
+    }
+
+    public Instant getPasswordChangedAt() {
+        return passwordChangedAt;
+    }
+
+    /** The only way to change the password, so {@link #passwordChangedAt} is always recorded. */
+    public void changePassword(String newPasswordHash, Instant now) {
+        this.password = requireText(newPasswordHash, "password");
+        this.passwordChangedAt = now;
     }
 
     public String getPhoneNumber() {
@@ -117,10 +154,6 @@ public class User extends AggregateRoot {
 
     public String getPassword() {
         return password;
-    }
-
-    public void setPassword(String passwordHash) {
-        this.password = requireText(passwordHash, "password");
     }
 
     public String getFirstName() {

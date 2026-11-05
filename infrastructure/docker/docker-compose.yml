@@ -40,5 +40,13 @@ services:
       - "16379:6379"        # 16379 instead of 6379 (matches application.yaml)
     command: redis-server --save 60 1
 
+  # Catches every email the app sends in development. Nothing reaches real inboxes.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: chama-mailpit
+    ports:
+      - "11025:1025"        # SMTP (application.yaml spring.mail.port)
+      - "18025:8025"        # Web UI: http://localhost:18025
+
 volumes:
   postgres_data:

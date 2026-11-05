@@ -10,29 +10,31 @@ import ke.chama.modules.auth.application.port.in.RefreshSessionUseCase;
 import ke.chama.modules.auth.application.port.in.RegisterUserCommand;
 import ke.chama.modules.auth.application.port.in.RegisterUserUseCase;
 import ke.chama.modules.auth.application.port.in.UserProfile;
-import ke.chama.modules.auth.application.port.out.AccessTokenIssuer;
 import ke.chama.modules.auth.application.port.out.PasswordHasher;
 import ke.chama.modules.auth.application.port.out.RefreshTokenRepository;
 import ke.chama.modules.auth.application.port.out.RoleRepository;
 import ke.chama.modules.auth.application.port.out.UserRepository;
 import ke.chama.modules.auth.domain.exception.AccountDisabledException;
+import ke.chama.modules.auth.domain.exception.AccountLockedException;
+import ke.chama.modules.auth.domain.exception.AuthException;
+import ke.chama.modules.auth.domain.exception.EmailNotVerifiedException;
 import ke.chama.modules.auth.domain.exception.InvalidCredentialsException;
 import ke.chama.modules.auth.domain.exception.InvalidTokenException;
 import ke.chama.modules.auth.domain.exception.UserAlreadyExistsException;
 import ke.chama.modules.auth.domain.exception.UserNotFoundException;
+import ke.chama.modules.auth.domain.model.LoginOutcome;
 import ke.chama.modules.auth.domain.model.RefreshToken;
 import ke.chama.modules.auth.domain.model.RevocationReason;
 import ke.chama.modules.auth.domain.model.Role;
 import ke.chama.modules.auth.domain.model.User;
-import ke.chama.shared.domain.exception.DomainValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,15 +46,13 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
-    /** BCrypt only uses the first 72 bytes; longer passwords would be silently truncated. */
-    static final int MAX_PASSWORD_BYTES = 72;
-    static final int MIN_PASSWORD_LENGTH = 8;
-
     private final UserRepository users;
     private final RoleRepository roles;
     private final RefreshTokenRepository refreshTokens;
     private final PasswordHasher passwordHasher;
-    private final AccessTokenIssuer accessTokenIssuer;
+    private final SessionIssuer sessions;
+    private final LoginThrottle throttle;
+    private final AccountLinks accountLinks;
     private final AuthProperties properties;
     private final ApplicationEventPublisher events;
     private final Clock clock;
@@ -67,7 +67,9 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
                        RoleRepository roles,
                        RefreshTokenRepository refreshTokens,
                        PasswordHasher passwordHasher,
-                       AccessTokenIssuer accessTokenIssuer,
+                       SessionIssuer sessions,
+                       LoginThrottle throttle,
+                       AccountLinks accountLinks,
                        AuthProperties properties,
                        ApplicationEventPublisher events,
                        Clock clock) {
@@ -75,7 +77,9 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
         this.roles = roles;
         this.refreshTokens = refreshTokens;
         this.passwordHasher = passwordHasher;
-        this.accessTokenIssuer = accessTokenIssuer;
+        this.sessions = sessions;
+        this.throttle = throttle;
+        this.accountLinks = accountLinks;
         this.properties = properties;
         this.events = events;
         this.clock = clock;
@@ -84,42 +88,65 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
 
     @Override
     public UserProfile register(RegisterUserCommand command) {
+        Instant now = clock.instant();
         String email = User.normalizeEmail(command.email());
         if (users.existsByEmail(email)) {
             throw new UserAlreadyExistsException(email);
         }
-        requireAcceptablePassword(command.password());
+        PasswordPolicy.requireAcceptable(command.password());
 
         Role defaultRole = roles.findByName(Role.USER)
                 .orElseThrow(() -> new IllegalStateException(Role.USER + " is missing; check the auth migrations"));
 
         User user = User.register(email, command.phoneNumber(), passwordHasher.hash(command.password()),
-                command.firstName(), command.lastName(), defaultRole, clock.instant());
+                command.firstName(), command.lastName(), defaultRole, now);
         users.save(user);
         user.pullDomainEvents().forEach(events::publishEvent);
+        accountLinks.sendEmailVerification(user, now);
 
         log.info("Registered user {}", user.getId());
         return UserProfile.from(user);
     }
 
+    /**
+     * Failed attempts must be recorded even though the method then throws, so the transaction
+     * must not roll back on auth failures; otherwise lockout could never trigger.
+     */
     @Override
+    @Transactional(noRollbackFor = AuthException.class)
     public AuthTokens login(LoginCommand command) {
+        Instant now = clock.instant();
         String password = command.password() == null ? "" : command.password();
-        if (password.getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) {
+        if (PasswordPolicy.exceedsMaxBytes(password)) {
             throw new InvalidCredentialsException();
         }
 
-        User user = users.findByEmail(User.normalizeEmail(command.email())).orElse(null);
+        String email = User.normalizeEmail(command.email());
+        User user = users.findByEmail(email).orElse(null);
+
+        Optional<Instant> lockedUntil = throttle.lockedUntil(email, user, now);
+        if (lockedUntil.isPresent()) {
+            throttle.record(email, user, LoginOutcome.ACCOUNT_LOCKED, command.ipAddress(), command.userAgent(), now);
+            throw new AccountLockedException(Duration.between(now, lockedUntil.get()));
+        }
+
         boolean passwordMatches = passwordHasher.matches(password,
                 user != null ? user.getPassword() : timingEqualizerHash);
-
         if (user == null || !passwordMatches) {
+            throttle.record(email, user, LoginOutcome.BAD_CREDENTIALS, command.ipAddress(), command.userAgent(), now);
             throw new InvalidCredentialsException();
         }
         if (!user.isEnabled()) {
+            throttle.record(email, user, LoginOutcome.ACCOUNT_DISABLED, command.ipAddress(), command.userAgent(), now);
             throw new AccountDisabledException();
         }
-        return startSession(user, clock.instant());
+        if (properties.requireVerifiedEmail() && !user.isEmailVerified()) {
+            throttle.record(email, user, LoginOutcome.EMAIL_NOT_VERIFIED, command.ipAddress(), command.userAgent(), now);
+            throw new EmailNotVerifiedException();
+        }
+
+        throttle.record(email, user, LoginOutcome.SUCCESS, command.ipAddress(), command.userAgent(), now);
+        return sessions.start(user, now);
     }
 
     /**
@@ -156,7 +183,7 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
         if (!user.isEnabled()) {
             throw new AccountDisabledException();
         }
-        return startSession(user, now);
+        return sessions.start(user, now);
     }
 
     @Override
@@ -167,7 +194,7 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
 
     @Override
     public void logoutAllSessions(UUID userId) {
-        int revoked = refreshTokens.revokeAllActiveForUser(userId, clock.instant(), RevocationReason.LOGOUT_ALL);
+        int revoked = sessions.endAll(userId, RevocationReason.LOGOUT_ALL, clock.instant());
         log.info("User {} logged out of {} session(s)", userId, revoked);
     }
 
@@ -179,16 +206,6 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
                 .orElseThrow(() -> new UserNotFoundException(userId.toString()));
     }
 
-    private AuthTokens startSession(User user, Instant now) {
-        AccessTokenIssuer.IssuedAccessToken accessToken = accessTokenIssuer.issue(user, now);
-
-        String rawRefreshToken = OpaqueTokens.generate();
-        Instant refreshExpiresAt = now.plus(properties.refreshTokenTtl());
-        refreshTokens.save(new RefreshToken(user, OpaqueTokens.sha256Hex(rawRefreshToken), refreshExpiresAt));
-
-        return new AuthTokens(accessToken.value(), accessToken.expiresAt(), rawRefreshToken, refreshExpiresAt);
-    }
-
     private Optional<RefreshToken> findByRawToken(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
             return Optional.empty();
@@ -197,19 +214,8 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
     }
 
     private void revokeAllAfterReuse(UUID userId, UUID tokenId, Instant now) {
-        int revoked = refreshTokens.revokeAllActiveForUser(userId, now, RevocationReason.REUSE_DETECTED);
+        int revoked = sessions.endAll(userId, RevocationReason.REUSE_DETECTED, now);
         log.warn("Refresh token {} was reused; revoked {} active session(s) of user {}", tokenId, revoked, userId);
-    }
-
-    private static void requireAcceptablePassword(String password) {
-        if (password == null || password.length() < MIN_PASSWORD_LENGTH) {
-            throw new DomainValidationException("AUTH_WEAK_PASSWORD",
-                    "Password must be at least " + MIN_PASSWORD_LENGTH + " characters");
-        }
-        if (password.getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) {
-            throw new DomainValidationException("AUTH_PASSWORD_TOO_LONG",
-                    "Password must be at most " + MAX_PASSWORD_BYTES + " bytes");
-        }
     }
 
     private static InvalidTokenException invalidRefreshToken() {

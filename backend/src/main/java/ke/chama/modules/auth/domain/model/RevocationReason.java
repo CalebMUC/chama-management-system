@@ -11,6 +11,8 @@ public enum RevocationReason {
     LOGOUT,
     /** The user logged out of every session. */
     LOGOUT_ALL,
+    /** The password was reset or changed; every existing session must log in again. */
+    PASSWORD_CHANGED,
     /**
      * An already-exchanged token was presented again, or two requests raced to use one token.
      * Either it was stolen or a client misbehaved; in both cases every session for the user

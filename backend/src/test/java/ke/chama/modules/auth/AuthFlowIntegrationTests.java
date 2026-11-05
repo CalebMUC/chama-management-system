@@ -148,6 +148,70 @@ class AuthFlowIntegrationTests {
     }
 
     @Nested
+    class LoginLockout {
+
+        @Test
+        void fiveWrongPasswordsLockEvenTheCorrectPassword() throws Exception {
+            String email = registered();
+            failLogins(email, 5);
+
+            login(email, PASSWORD)
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                    .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_LOCKED"));
+        }
+
+        @Test
+        void unknownEmailsLockTheSameWaySoAccountsCannotBeDiscovered() throws Exception {
+            String ghost = uniqueEmail();
+            failLogins(ghost, 5);
+
+            login(ghost, PASSWORD)
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_LOCKED"));
+        }
+
+        @Test
+        void aSuccessfulLoginResetsTheCount() throws Exception {
+            String email = registered();
+            failLogins(email, 4);
+            login(email, PASSWORD).andExpect(status().isOk());
+            failLogins(email, 4);
+
+            login(email, PASSWORD).andExpect(status().isOk());
+        }
+
+        @Test
+        void recordsEveryAttemptWithClientDetails() throws Exception {
+            String email = registered();
+            failLogins(email, 1);
+            mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                            .header(HttpHeaders.USER_AGENT, "ChamaApp/1.0 (Android)")
+                            .with(request -> {
+                                request.setRemoteAddr("196.201.214.10");
+                                return request;
+                            })
+                            .content("""
+                                    {"email":"%s","password":"%s"}""".formatted(email, PASSWORD)))
+                    .andExpect(status().isOk());
+
+            List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "select outcome, ip_address, user_agent, user_id from auth.login_attempts where email = ? order by attempted_at",
+                    email);
+            assertThat(rows).extracting(r -> r.get("outcome")).containsExactly("BAD_CREDENTIALS", "SUCCESS");
+            assertThat(rows.getLast().get("ip_address")).isEqualTo("196.201.214.10");
+            assertThat(rows.getLast().get("user_agent")).isEqualTo("ChamaApp/1.0 (Android)");
+            assertThat(rows.getLast().get("user_id")).isNotNull();
+        }
+
+        private void failLogins(String email, int times) throws Exception {
+            for (int i = 0; i < times; i++) {
+                login(email, "Wrong2026pass").andExpect(status().isUnauthorized());
+            }
+        }
+    }
+
+    @Nested
     class AccessToken {
 
         @Test

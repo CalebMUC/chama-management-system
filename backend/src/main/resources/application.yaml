@@ -48,6 +48,19 @@ spring:
     problemdetails:
       enabled: true
 
+  # Local default is Mailpit from docker-compose (web UI: http://localhost:18025).
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:11025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
   modulith:
     # Modules live under ke.chama.modules.*, not directly under ke.chama, so each
     # module is declared with @ApplicationModule in its package-info.java.
@@ -55,6 +68,10 @@ spring:
     events:
       # Retry events whose listener had not completed when the app last stopped.
       republish-outstanding-events-on-restart: true
+      # Delete events once every listener succeeded. Some events carry live secrets
+      # (verification and reset links), which must not pile up in the database.
+      # Accountability lives in the audit log and ledger, not in this table.
+      completion-mode: delete
       jdbc:
         schema-initialization:
           enabled: false          # Created by Flyway (V3).
@@ -68,6 +85,20 @@ chama:
     jwt-secret: ${JWT_SECRET:local-dev-only-insecure-jwt-secret-do-not-use-in-production-0000}
     access-token-ttl: 15m
     refresh-token-ttl: 7d
+    # Refuse login until the email is verified. Off for now: chama officials may onboard
+    # members who verify later. Features that send email can check emailVerified instead.
+    require-verified-email: false
+    lockout:
+      max-failed-attempts: 5
+      duration: 15m
+    links:
+      # Emailed links open the frontend, which posts the token back to the API.
+      frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+      email-verification-ttl: 24h
+      password-reset-ttl: 30m
+      resend-interval: 60s
+  notification:
+    mail-from: ${MAIL_FROM:Chama <no-reply@chama.local>}
 
 server:
   port: 8080

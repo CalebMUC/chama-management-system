@@ -1,7 +1,9 @@
 package ke.chama.modules.auth.presentation.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import ke.chama.modules.auth.application.port.in.GetUserProfileUseCase;
+import ke.chama.modules.auth.application.port.in.LoginCommand;
 import ke.chama.modules.auth.application.port.in.LoginUseCase;
 import ke.chama.modules.auth.application.port.in.LogoutUseCase;
 import ke.chama.modules.auth.application.port.in.RefreshSessionUseCase;
@@ -12,6 +14,7 @@ import ke.chama.modules.auth.presentation.dto.request.RegisterRequest;
 import ke.chama.modules.auth.presentation.dto.response.AuthResponse;
 import ke.chama.modules.auth.presentation.dto.response.UserResponse;
 import ke.chama.shared.security.CurrentUser;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,9 +68,16 @@ class AuthController {
         return UserResponse.from(registerUser.register(request.toCommand()));
     }
 
+    /**
+     * The client IP is recorded with the attempt. Behind a load balancer, set
+     * {@code server.forward-headers-strategy: framework} so this is the real client address
+     * (X-Forwarded-For) rather than the proxy's.
+     */
     @PostMapping("/login")
-    AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        return AuthResponse.from(login.login(request.toCommand()), clock.instant());
+    AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        LoginCommand command = new LoginCommand(request.email(), request.password(),
+                http.getRemoteAddr(), http.getHeader(HttpHeaders.USER_AGENT));
+        return AuthResponse.from(login.login(command), clock.instant());
     }
 
     @PostMapping("/refresh")

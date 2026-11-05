@@ -2,6 +2,7 @@ package ke.chama.shared.web;
 
 import ke.chama.shared.domain.exception.DomainException;
 import ke.chama.shared.domain.exception.ErrorType;
+import ke.chama.shared.domain.exception.RetryAfterAware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -46,7 +47,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         } else {
             log.debug("Domain rejection {}: {}", ex.getCode(), ex.getMessage());
         }
-        return problem(status, ex.getMessage(), ex.getCode());
+        ResponseEntity<ProblemDetail> response = problem(status, ex.getMessage(), ex.getCode());
+        if (ex instanceof RetryAfterAware retryable) {
+            long seconds = Math.max(1, Math.ceilDiv(retryable.retryAfter().toMillis(), 1000));
+            return ResponseEntity.status(status)
+                    .header(HttpHeaders.RETRY_AFTER, Long.toString(seconds))
+                    .body(response.getBody());
+        }
+        return response;
     }
 
     /**
@@ -114,6 +122,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
             case CONFLICT -> HttpStatus.CONFLICT;
             case BUSINESS_RULE -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case TOO_MANY_REQUESTS -> HttpStatus.TOO_MANY_REQUESTS;
         };
     }
 

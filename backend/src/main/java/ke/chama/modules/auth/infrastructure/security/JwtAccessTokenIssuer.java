@@ -15,7 +15,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Access token claims: {@code sub} (user id), {@code email}, {@code roles} (platform roles),
+ * Access token claims: {@code sub} (user id), {@code email}, {@code email_verified}, {@code roles} (platform roles),
  * {@code iss}, {@code iat}, {@code exp}, {@code jti}.
  * <p>
  * Chama permissions are deliberately left out. They are looked up per request (Phase 2), so
@@ -25,6 +25,8 @@ import java.util.UUID;
 class JwtAccessTokenIssuer implements AccessTokenIssuer {
 
     static final String EMAIL_CLAIM = "email";
+    /** Standard OIDC claim name. */
+    static final String EMAIL_VERIFIED_CLAIM = "email_verified";
     static final String ROLES_CLAIM = "roles";
 
     private final JwtEncoder encoder;
@@ -45,6 +47,7 @@ class JwtAccessTokenIssuer implements AccessTokenIssuer {
                 .expiresAt(expiresAt)
                 .id(UUID.randomUUID().toString())
                 .claim(EMAIL_CLAIM, user.getEmail())
+                .claim(EMAIL_VERIFIED_CLAIM, user.isEmailVerified())
                 .claim(ROLES_CLAIM, user.getRoles().stream().map(Role::getName).sorted().toList())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
@@ -73,6 +74,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void uniqueConstraintRaceIsConflictWithoutSqlDetails() throws Exception {
+        mvc.perform(get("/duplicate"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DATA_CONFLICT"))
+                .andExpect(jsonPath("$.detail").value("The request conflicts with existing data"));
+    }
+
+    @Test
     void unexpectedErrorsDoNotLeakDetails() throws Exception {
         mvc.perform(get("/boom"))
                 .andExpect(status().isInternalServerError())
@@ -104,6 +113,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/stale")
         void stale() {
             throw new OptimisticLockingFailureException("stale");
+        }
+
+        @GetMapping("/duplicate")
+        void duplicate() {
+            throw new DataIntegrityViolationException("duplicate key value violates unique constraint \"users_email_key\"");
         }
 
         @GetMapping("/boom")

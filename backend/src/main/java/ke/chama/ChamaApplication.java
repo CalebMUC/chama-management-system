@@ -2,7 +2,7 @@ package ke.chama;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -16,7 +16,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * Each module is independently extractable when scale demands it.
  */
 @SpringBootApplication
-@EnableScheduling   // Required for @Scheduled contribution cycle jobs
+@ConfigurationPropertiesScan   // Binds @ConfigurationProperties records such as AuthProperties
+@EnableScheduling              // Required for @Scheduled jobs (contribution cycles, token cleanup)
 public class ChamaApplication {
 
 	public static void main(String[] args) {

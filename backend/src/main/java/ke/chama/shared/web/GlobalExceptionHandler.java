@@ -4,6 +4,7 @@ import ke.chama.shared.domain.exception.DomainException;
 import ke.chama.shared.domain.exception.ErrorType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -68,6 +69,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT,
                 "This record was changed by someone else. Reload it and try again.",
                 "CONCURRENT_MODIFICATION");
+    }
+
+    /**
+     * A database constraint rejected the write, typically two requests racing past an
+     * "already exists?" check (e.g. registering the same email twice at once).
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        return problem(HttpStatus.CONFLICT, "The request conflicts with existing data", "DATA_CONFLICT");
     }
 
     @ExceptionHandler(Exception.class)

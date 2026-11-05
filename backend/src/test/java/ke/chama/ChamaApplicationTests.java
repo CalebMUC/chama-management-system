@@ -1,9 +1,6 @@
 package ke.chama;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Boots the whole application against a real PostgreSQL. This runs every Flyway migration and
@@ -12,9 +9,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>
  * Skipped when Docker is not running.
  */
-@SpringBootTest
-@Import(TestcontainersConfiguration.class)
-@Testcontainers(disabledWithoutDocker = true)
+@IntegrationTest
 class ChamaApplicationTests {
 
     @Test

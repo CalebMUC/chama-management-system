@@ -61,14 +61,13 @@ spring:
 
 chama:
   time-zone: Africa/Nairobi
-
-jwt:
-  # The default is for local development only. Production must set JWT_SECRET
-  # (at least 256 bits); Phase 1 makes startup fail outside the local profile
-  # if the default is still in use.
-  secret: ${JWT_SECRET:local-dev-only-insecure-jwt-secret-do-not-use-in-production-0000}
-  access-token-expiry-ms: 900000
-  refresh-token-expiry-ms: 604800000
+  auth:
+    issuer: chama-backend
+    # The default is for local development only. Every deployed environment must set
+    # JWT_SECRET (at least 32 bytes). Startup fails under the 'prod' profile if it isn't set.
+    jwt-secret: ${JWT_SECRET:local-dev-only-insecure-jwt-secret-do-not-use-in-production-0000}
+    access-token-ttl: 15m
+    refresh-token-ttl: 7d
 
 server:
   port: 8080

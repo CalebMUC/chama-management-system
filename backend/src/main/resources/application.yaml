@@ -2,10 +2,12 @@ spring:
   application:
     name: chama-backend
 
+  # Defaults match infrastructure/docker/docker-compose.yml for local development.
+  # Every deployed environment must set these through environment variables.
   datasource:
-    url: jdbc:postgresql://localhost:15432/chama_db
-    username: postgres
-    password: postgres
+    url: ${DB_URL:jdbc:postgresql://localhost:15432/chama_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -13,14 +15,18 @@ spring:
       connection-timeout: 30000
 
   jpa:
+    # No lazy loading during JSON rendering: services return DTOs, not entities.
+    open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: validate          # Flyway owns the schema; Hibernate only checks it matches.
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         default_schema: public
+        jdbc:
+          time_zone: UTC
 
   flyway:
     enabled: true
@@ -29,17 +35,38 @@ spring:
 
   data:
     redis:
-      host: localhost
-      port: 16379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:16379}
 
   rabbitmq:
-    host: localhost
-    port: 15673
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:15673}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+  mvc:
+    problemdetails:
+      enabled: true
+
+  modulith:
+    # Modules live under ke.chama.modules.*, not directly under ke.chama, so each
+    # module is declared with @ApplicationModule in its package-info.java.
+    detection-strategy: explicitly-annotated
+    events:
+      # Retry events whose listener had not completed when the app last stopped.
+      republish-outstanding-events-on-restart: true
+      jdbc:
+        schema-initialization:
+          enabled: false          # Created by Flyway (V3).
+
+chama:
+  time-zone: Africa/Nairobi
 
 jwt:
-  secret: "chama-secret-key-minimum-256-bits-long-change-in-production-environment"
+  # The default is for local development only. Production must set JWT_SECRET
+  # (at least 256 bits); Phase 1 makes startup fail outside the local profile
+  # if the default is still in use.
+  secret: ${JWT_SECRET:local-dev-only-insecure-jwt-secret-do-not-use-in-production-0000}
   access-token-expiry-ms: 900000
   refresh-token-expiry-ms: 604800000
 
@@ -53,7 +80,7 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
 
 logging:
   level:

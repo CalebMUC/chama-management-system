@@ -7,7 +7,7 @@ import java.util.UUID;
 
 
 @Entity
-@Table(name = "roles")
+@Table(name = "roles", schema = "auth")
 public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

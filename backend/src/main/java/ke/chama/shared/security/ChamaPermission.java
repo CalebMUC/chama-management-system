@@ -42,6 +42,10 @@ public enum ChamaPermission {
     INVESTMENT_MANAGE,
 
     LEDGER_VIEW,
+    /** Post manual journal entries (opening balances, bank charges) and reverse entries. */
+    LEDGER_POST,
+    /** Add accounts to the chart of accounts and deactivate them. */
+    LEDGER_ACCOUNTS_MANAGE,
     REPORT_VIEW_ALL,
     AUDIT_LOG_VIEW
 }

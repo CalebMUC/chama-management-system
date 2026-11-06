@@ -84,7 +84,8 @@ public class Chama extends AggregateRoot {
     public static Chama found(UUID id, String code, String name, String description, Currency currency,
                               ChamaSettings settings, UUID founderUserId, String founderEmail, Instant now) {
         Chama chama = new Chama(id, code, name, description, currency, settings, founderUserId);
-        chama.registerEvent(new ChamaCreated(UUID.randomUUID(), now, chama.id, chama.name, founderUserId, founderEmail));
+        chama.registerEvent(new ChamaCreated(UUID.randomUUID(), now, chama.id, chama.name, chama.currency,
+                founderUserId, founderEmail));
         return chama;
     }
 

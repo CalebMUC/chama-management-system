@@ -187,3 +187,19 @@ Branch on `error.code`, never on `message`.
 | `MEMBER_INVALID_STATE`        | 422    | Action not allowed in the membership's current status         |
 | `MEMBER_LAST_CHAIRPERSON`     | 422    | The chama must keep at least one chairperson                  |
 | `ROLE_PERMISSIONS_LOCKOUT`    | 422    | The chairperson role must keep role and permission management |
+
+**Ledger**
+
+| Code                             | Status | When                                                          |
+|----------------------------------|--------|---------------------------------------------------------------|
+| `LEDGER_UNBALANCED_ENTRY`        | 400    | Debits do not equal credits, or fewer than two lines           |
+| `LEDGER_INVALID_ENTRY`           | 400    | Missing description, zero amount, future date, or a line with both/neither debit and credit |
+| `LEDGER_MEMBER_MISMATCH`         | 400    | A member account line without `memberUserId`, a member on another account, or an unknown member |
+| `LEDGER_CURRENCY_MISMATCH`       | 400    | Amount in a currency other than the chama's                    |
+| `LEDGER_INVALID_ACCOUNT`         | 400    | Malformed account code or name, or deactivating a system account |
+| `LEDGER_ACCOUNT_NOT_FOUND`       | 404    | No account with that code or id in this chama                  |
+| `LEDGER_ENTRY_NOT_FOUND`         | 404    | No such journal entry in this chama                            |
+| `LEDGER_ACCOUNT_CODE_TAKEN`      | 409    | The account code is already used                               |
+| `LEDGER_ALREADY_REVERSED`        | 409    | The entry has already been reversed                            |
+| `LEDGER_ACCOUNT_INACTIVE`        | 422    | Posting to a deactivated account                               |
+| `LEDGER_CANNOT_REVERSE_REVERSAL` | 422    | Reversing a reversal entry                                     |

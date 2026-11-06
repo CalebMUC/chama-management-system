@@ -6,13 +6,14 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      # Modular monolith: one database, one schema per module (created by Flyway).
+      POSTGRES_DB: chama_db
     ports:
       - "15432:5432"        # 15432 instead of 5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d chama_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,7 +26,7 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     ports:
       - "15673:5672"        # 15673 instead of 5672
-      - "15672:15672"       # management UI — usually open
+      - "15672:15672"       # management UI
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -36,8 +37,16 @@ services:
     image: redis:7-alpine
     container_name: chama-redis
     ports:
-      - "6379:6379"        # 16379 instead of 6379
+      - "16379:6379"        # 16379 instead of 6379 (matches application.yaml)
     command: redis-server --save 60 1
+
+  # Catches every email the app sends in development. Nothing reaches real inboxes.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: chama-mailpit
+    ports:
+      - "11025:1025"        # SMTP (application.yaml spring.mail.port)
+      - "18025:8025"        # Web UI: http://localhost:18025
 
 volumes:
   postgres_data:

@@ -1,0 +1,199 @@
+package ke.chama.modules.auth.domain.model;
+
+import jakarta.persistence.*;
+import ke.chama.modules.auth.domain.event.UserRegisteredEvent;
+import ke.chama.shared.domain.AggregateRoot;
+import ke.chama.shared.domain.PhoneNumber;
+import ke.chama.shared.domain.exception.DomainValidationException;
+
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * A login identity. Not the same thing as a chama member.
+ * <p>
+ * One user can belong to several chamas with a different role in each (Treasurer in one,
+ * Member in another). Chama roles therefore live on the Membership in the member module,
+ * not here. {@link #roles} holds platform roles only: ROLE_USER for everyone, ROLE_ADMIN
+ * for system administrators.
+ */
+@Entity
+@Table(name = "users", schema = "auth")
+public class User extends AggregateRoot {
+
+    /** Assigned on creation (not by the database) so the registration event can carry it. */
+    @Id
+    private UUID id;
+
+    /** Stored trimmed and lower-cased, so "Jane@Mail.com" and "jane@mail.com" are one account. */
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    /** E.164 format (+2547XXXXXXXX). Needed for M-Pesa and SMS notifications. */
+    @Column(name = "phone_number", nullable = false)
+    private String phoneNumber;
+
+    /** Password hash (BCrypt via Spring's DelegatingPasswordEncoder). Never the raw password. */
+    @Column(nullable = false)
+    private String password;
+
+    @Column(name = "first_name", nullable = false)
+    private String firstName;
+
+    @Column(name = "last_name", nullable = false)
+    private String lastName;
+
+    @Column(name = "is_enabled", nullable = false)
+    private boolean isEnabled = true;
+
+    /** Set when the user proves they own the email (verification link or password reset link). */
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    /** Last password change. Failed logins before this moment no longer count toward lockout. */
+    @Column(name = "password_changed_at")
+    private Instant passwordChangedAt;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "user_roles",
+            schema = "auth",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
+
+    /** Required by JPA. */
+    protected User() {
+    }
+
+    public User(String email, String phoneNumber, String passwordHash, String firstName, String lastName) {
+        this.id = UUID.randomUUID();
+        this.email = normalizeEmail(email);
+        this.phoneNumber = PhoneNumber.of(phoneNumber).value();
+        this.password = requireText(passwordHash, "password");
+        this.firstName = requireText(firstName, "firstName");
+        this.lastName = requireText(lastName, "lastName");
+    }
+
+    /** Creates a new account with its default role and records {@link UserRegisteredEvent}. */
+    public static User register(String email, String phoneNumber, String passwordHash,
+                                String firstName, String lastName, Role defaultRole, Instant now) {
+        User user = new User(email, phoneNumber, passwordHash, firstName, lastName);
+        user.addRole(defaultRole);
+        user.registerEvent(UserRegisteredEvent.of(
+                user.id, user.email, user.phoneNumber, user.firstName, user.lastName, now));
+        return user;
+    }
+
+    public static String normalizeEmail(String email) {
+        if (email == null || email.isBlank() || !email.contains("@")) {
+            throw new DomainValidationException("AUTH_INVALID_EMAIL", "A valid email address is required");
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String requireText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new DomainValidationException("AUTH_INVALID_" + field.toUpperCase(Locale.ROOT), field + " is required");
+        }
+        return value.trim();
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    /** A new address is unproven, so changing the email clears verification. */
+    public void setEmail(String email) {
+        String normalized = normalizeEmail(email);
+        if (!normalized.equals(this.email)) {
+            this.emailVerifiedAt = null;
+        }
+        this.email = normalized;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void markEmailVerified(Instant now) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = now;
+        }
+    }
+
+    public Instant getPasswordChangedAt() {
+        return passwordChangedAt;
+    }
+
+    /** The only way to change the password, so {@link #passwordChangedAt} is always recorded. */
+    public void changePassword(String newPasswordHash, Instant now) {
+        this.password = requireText(newPasswordHash, "password");
+        this.passwordChangedAt = now;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = PhoneNumber.of(phoneNumber).value();
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = requireText(firstName, "firstName");
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = requireText(lastName, "lastName");
+    }
+
+    public boolean isEnabled() {
+        return isEnabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        isEnabled = enabled;
+    }
+
+    /** Platform roles Spring Security puts in the access token. */
+    public Set<Role> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<Role> roles) {
+        this.roles = roles;
+    }
+
+    /**
+     * Adds a single role. Safer than {@code getRoles().add(role)} from outside because the
+     * mutation stays inside the aggregate root (a DDD principle).
+     */
+    public void addRole(Role role) {
+        this.roles.add(role);
+    }
+}

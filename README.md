@@ -4,7 +4,7 @@
 
 **A production-grade backend platform for managing Kenyan investment groups (Chamas)**
 
-[![Java](https://img.shields.io/badge/Java-21-ED8B00?style=flat&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Java](https://img.shields.io/badge/Java-25-ED8B00?style=flat&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/25/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?style=flat&logo=spring-boot)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-316192?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.13-FF6600?style=flat&logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
@@ -165,7 +165,7 @@ POST /loans/apply ──► loan-service
 
 ### Prerequisites
 
-- Java 21+
+- Java 25+
 - Docker & Docker Compose
 - Maven 3.9+
 

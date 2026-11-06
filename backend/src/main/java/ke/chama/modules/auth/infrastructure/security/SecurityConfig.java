@@ -36,6 +36,10 @@ class SecurityConfig {
             "/api/v1/auth/password/reset"
     };
 
+    static final String[] API_DOCS_ENDPOINTS = {
+            "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**"
+    };
+
     @Bean
     SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
         ProblemDetailSecurityHandlers handlers = new ProblemDetailSecurityHandlers();
@@ -50,6 +54,8 @@ class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, PUBLIC_AUTH_ENDPOINTS).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/error").permitAll()
+                        // API docs. Springdoc is disabled under 'prod', so there these paths are 404.
+                        .requestMatchers(HttpMethod.GET, API_DOCS_ENDPOINTS).permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))

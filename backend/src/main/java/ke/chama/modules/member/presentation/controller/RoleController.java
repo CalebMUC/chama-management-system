@@ -1,5 +1,6 @@
 package ke.chama.modules.member.presentation.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.member.application.port.in.RolePermissionAdmin;
 import ke.chama.modules.member.domain.model.ChamaRole;
@@ -24,6 +25,7 @@ import java.util.UUID;
  * PUT /api/v1/chamas/{chamaId}/roles/{role}/permissions   ROLE_PERMISSIONS_MANAGE  {permissions}
  * </pre>
  */
+@Tag(name = "Roles & permissions", description = "Which permissions each role holds in a chama")
 @RestController
 @RequestMapping("/api/v1/chamas/{chamaId}/roles")
 class RoleController {

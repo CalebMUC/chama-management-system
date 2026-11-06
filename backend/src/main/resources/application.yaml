@@ -119,3 +119,15 @@ logging:
     ke.chama: DEBUG
     org.springframework.security: INFO
     org.hibernate.SQL: INFO
+
+# API docs: http://localhost:8080/swagger-ui.html (JSON at /v3/api-docs). Off under 'prod'.
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    persist-authorization: true   # keep the pasted access token across page reloads
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  default-produces-media-type: application/json

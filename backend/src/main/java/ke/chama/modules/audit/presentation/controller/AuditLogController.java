@@ -1,5 +1,6 @@
 package ke.chama.modules.audit.presentation.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import ke.chama.modules.audit.application.port.in.AuditLogQueries;
 import ke.chama.modules.audit.application.port.in.AuditLogQueries.AuditLogEntry;
 import ke.chama.shared.security.ChamaPermission;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /** GET /api/v1/chamas/{chamaId}/audit-log?action=&page=&size=   (AUDIT_LOG_VIEW) */
+@Tag(name = "Audit log", description = "Append-only record of who did what in a chama")
 @RestController
 class AuditLogController {
 

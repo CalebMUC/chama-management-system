@@ -1,5 +1,6 @@
 package ke.chama.modules.member.presentation.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import ke.chama.modules.member.application.port.in.MemberViews.InvitationView;
 import ke.chama.modules.member.application.port.in.MemberViews.MyChamaView;
 import ke.chama.modules.member.application.port.in.MembershipQueries;
@@ -16,6 +17,7 @@ import java.util.List;
  * GET /api/v1/me/invitations   open invitations sent to my email
  * </pre>
  */
+@Tag(name = "My chamas", description = "The caller's chamas and pending invitations")
 @RestController
 @RequestMapping("/api/v1/me")
 class MyMembershipsController {

@@ -1,5 +1,6 @@
 package ke.chama.modules.auth.presentation.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.auth.application.port.in.ChangePasswordUseCase;
 import ke.chama.modules.auth.application.port.in.EmailVerificationUseCase;
@@ -30,6 +31,7 @@ import java.time.Clock;
  * "resend" and "forgot" always answer 202 whether or not the email is registered, so they
  * cannot be used to discover members' emails.
  */
+@Tag(name = "Account", description = "Email verification and passwords")
 @RestController
 @RequestMapping("/api/v1/auth")
 class AccountController {

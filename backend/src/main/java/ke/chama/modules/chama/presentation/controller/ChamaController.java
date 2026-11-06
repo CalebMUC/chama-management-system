@@ -1,5 +1,6 @@
 package ke.chama.modules.chama.presentation.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.chama.application.port.in.ChamaUseCases;
 import ke.chama.modules.chama.presentation.dto.request.ChamaSettingsRequest;
@@ -28,6 +29,7 @@ import java.util.UUID;
  * </pre>
  * The chamas I belong to: {@code GET /api/v1/me/chamas} (member module).
  */
+@Tag(name = "Chamas", description = "Create a chama, view it, change its settings")
 @RestController
 @RequestMapping("/api/v1/chamas")
 class ChamaController {

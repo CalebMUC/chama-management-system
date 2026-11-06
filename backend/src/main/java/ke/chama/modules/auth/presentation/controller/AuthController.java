@@ -1,5 +1,6 @@
 package ke.chama.modules.auth.presentation.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import ke.chama.modules.auth.application.port.in.GetUserProfileUseCase;
@@ -37,6 +38,7 @@ import java.time.Clock;
  * Logout is public because the refresh token in the body is the proof: it still works when
  * the access token has already expired.
  */
+@Tag(name = "Auth", description = "Register, log in, refresh and end sessions, current user")
 @RestController
 @RequestMapping("/api/v1/auth")
 class AuthController {

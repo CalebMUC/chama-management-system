@@ -1,5 +1,6 @@
 package ke.chama.modules.member.presentation.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.member.application.port.in.MemberViews.MemberView;
 import ke.chama.modules.member.application.port.in.MemberViews.MyMembershipView;
@@ -43,6 +44,7 @@ import java.util.UUID;
  * GET  /api/v1/chamas/{chamaId}/members/me                   active member: own membership + permissions
  * </pre>
  */
+@Tag(name = "Members", description = "Invitations, approvals, suspensions and roles within a chama")
 @RestController
 @RequestMapping("/api/v1/chamas/{chamaId}/members")
 class MemberController {

@@ -53,7 +53,7 @@ class ChamaMembershipIntegrationTests {
 
             mvc.perform(unverified.post("/api/v1/chamas", "{\"name\":\"Umoja Group\"}"))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("CHAMA_EMAIL_NOT_VERIFIED"));
+                    .andExpect(jsonPath("$.error.code").value("CHAMA_EMAIL_NOT_VERIFIED"));
         }
 
         @Test
@@ -62,17 +62,17 @@ class ChamaMembershipIntegrationTests {
 
             mvc.perform(founder.post("/api/v1/chamas", "{\"name\":\"  Umoja Women Group \"}"))
                     .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.name").value("Umoja Women Group"))
-                    .andExpect(jsonPath("$.currency").value("KES"))
-                    .andExpect(jsonPath("$.settings.contributionAmountMinor").value(500000))
-                    .andExpect(jsonPath("$.settings.loanMaxMultiplier").value(3));
+                    .andExpect(jsonPath("$.data.name").value("Umoja Women Group"))
+                    .andExpect(jsonPath("$.data.currency").value("KES"))
+                    .andExpect(jsonPath("$.data.settings.contributionAmountMinor").value(500000))
+                    .andExpect(jsonPath("$.data.settings.loanMaxMultiplier").value(3));
             UUID chamaId = latestChamaOf(founder);
 
             mvc.perform(founder.get("/api/v1/chamas/{id}/members/me", chamaId))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.membership.memberNumber").value(1))
-                    .andExpect(jsonPath("$.membership.roles").value(hasItems("MEMBER", "CHAIRPERSON")))
-                    .andExpect(jsonPath("$.permissions").value(hasItems("ROLE_PERMISSIONS_MANAGE", "AUDIT_LOG_VIEW")));
+                    .andExpect(jsonPath("$.data.membership.memberNumber").value(1))
+                    .andExpect(jsonPath("$.data.membership.roles").value(hasItems("MEMBER", "CHAIRPERSON")))
+                    .andExpect(jsonPath("$.data.permissions").value(hasItems("ROLE_PERMISSIONS_MANAGE", "AUDIT_LOG_VIEW")));
         }
 
         @Test
@@ -85,7 +85,7 @@ class ChamaMembershipIntegrationTests {
                              "loanInterestBasisPoints":1000,"loanMinMembershipMonths":3,"loanGuarantorThresholdMinor":5000000,
                              "loanGuarantorsRequired":2,"approvalQuorum":2}}"""))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("CHAMA_INVALID_SETTINGS"));
+                    .andExpect(jsonPath("$.error.code").value("CHAMA_INVALID_SETTINGS"));
         }
     }
 
@@ -101,27 +101,27 @@ class ChamaMembershipIntegrationTests {
             String invited = mvc.perform(chair.post("/api/v1/chamas/{id}/members/invitations",
                             "{\"email\":\"%s\"}".formatted(jane.email().toUpperCase()), chamaId))
                     .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.status").value("INVITED"))
+                    .andExpect(jsonPath("$.data.status").value("INVITED"))
                     .andReturn().getResponse().getContentAsString();
-            UUID membershipId = UUID.fromString(JsonPath.read(invited, "$.membershipId"));
+            UUID membershipId = UUID.fromString(JsonPath.read(invited, "$.data.membershipId"));
             assertThat(emails.awaitEmail(jane.email(), s -> s.startsWith("You're invited")).body()).contains("Kamau Test");
 
             mvc.perform(jane.get("/api/v1/me/invitations"))
-                    .andExpect(jsonPath("$[*].membershipId").value(hasItem(membershipId.toString())));
+                    .andExpect(jsonPath("$.data[*].membershipId").value(hasItem(membershipId.toString())));
 
             mvc.perform(jane.post("/api/v1/chamas/{c}/members/{m}/accept", chamaId, membershipId))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("PENDING_APPROVAL"));
+                    .andExpect(jsonPath("$.data.status").value("PENDING_APPROVAL"));
 
             mvc.perform(chair.post("/api/v1/chamas/{c}/members/{m}/approve", chamaId, membershipId))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("ACTIVE"))
-                    .andExpect(jsonPath("$.memberNumber").value(2))
-                    .andExpect(jsonPath("$.firstName").value("Jane"));
+                    .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                    .andExpect(jsonPath("$.data.memberNumber").value(2))
+                    .andExpect(jsonPath("$.data.firstName").value("Jane"));
 
             assertThat(emails.awaitEmail(jane.email(), s -> s.startsWith("Welcome")).body()).contains("member number is 2");
             mvc.perform(jane.get("/api/v1/me/chamas"))
-                    .andExpect(jsonPath("$[*].chamaId").value(hasItem(chamaId.toString())));
+                    .andExpect(jsonPath("$.data[*].chamaId").value(hasItem(chamaId.toString())));
         }
 
         @Test
@@ -133,7 +133,7 @@ class ChamaMembershipIntegrationTests {
 
             mvc.perform(unverified.post("/api/v1/chamas/{c}/members/{m}/accept", chamaId, membershipId))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("MEMBER_EMAIL_NOT_VERIFIED"));
+                    .andExpect(jsonPath("$.error.code").value("MEMBER_EMAIL_NOT_VERIFIED"));
         }
 
         @Test
@@ -146,7 +146,7 @@ class ChamaMembershipIntegrationTests {
 
             mvc.perform(intruder.post("/api/v1/chamas/{c}/members/{m}/accept", chamaId, membershipId))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("MEMBER_INVITATION_NOT_YOURS"));
+                    .andExpect(jsonPath("$.error.code").value("MEMBER_INVITATION_NOT_YOURS"));
         }
 
         @Test
@@ -157,7 +157,7 @@ class ChamaMembershipIntegrationTests {
 
             mvc.perform(chair.post("/api/v1/chamas/{id}/members/invitations", "{\"email\":\"twice@example.com\"}", chamaId))
                     .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.code").value("MEMBER_ALREADY_EXISTS"));
+                    .andExpect(jsonPath("$.error.code").value("MEMBER_ALREADY_EXISTS"));
         }
     }
 
@@ -175,7 +175,7 @@ class ChamaMembershipIntegrationTests {
             mvc.perform(member.get("/api/v1/chamas/{id}/members", chamaId)).andExpect(status().isOk());
             mvc.perform(member.put("/api/v1/chamas/{id}/settings", standardSettingsJson(), chamaId))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+                    .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
             mvc.perform(member.post("/api/v1/chamas/{id}/members/invitations", "{\"email\":\"x@example.com\"}", chamaId))
                     .andExpect(status().isForbidden());
             mvc.perform(member.get("/api/v1/chamas/{id}/audit-log", chamaId)).andExpect(status().isForbidden());
@@ -200,11 +200,11 @@ class ChamaMembershipIntegrationTests {
 
             mvc.perform(chair.put("/api/v1/chamas/{c}/members/{m}/roles", "{\"roles\":[\"TREASURER\"]}", chamaId, membershipId))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.roles").value(hasItems("MEMBER", "TREASURER")));
+                    .andExpect(jsonPath("$.data.roles").value(hasItems("MEMBER", "TREASURER")));
 
             mvc.perform(treasurer.get("/api/v1/chamas/{id}/members/me", chamaId))
-                    .andExpect(jsonPath("$.permissions").value(hasItems("CONTRIBUTION_RECORD", "LOAN_DISBURSE")))
-                    .andExpect(jsonPath("$.permissions").value(not(hasItem("EXPENSE_APPROVE"))));
+                    .andExpect(jsonPath("$.data.permissions").value(hasItems("CONTRIBUTION_RECORD", "LOAN_DISBURSE")))
+                    .andExpect(jsonPath("$.data.permissions").value(not(hasItem("EXPENSE_APPROVE"))));
             mvc.perform(treasurer.get("/api/v1/chamas/{id}/audit-log", chamaId)).andExpect(status().isForbidden());
         }
 
@@ -232,7 +232,7 @@ class ChamaMembershipIntegrationTests {
             mvc.perform(chair.put("/api/v1/chamas/{id}/roles/CHAIRPERSON/permissions",
                             "{\"permissions\":[\"CHAMA_VIEW\",\"MEMBER_ROLES_MANAGE\"]}", chamaId))
                     .andExpect(status().isUnprocessableEntity())
-                    .andExpect(jsonPath("$.code").value("ROLE_PERMISSIONS_LOCKOUT"));
+                    .andExpect(jsonPath("$.error.code").value("ROLE_PERMISSIONS_LOCKOUT"));
         }
     }
 
@@ -244,11 +244,11 @@ class ChamaMembershipIntegrationTests {
             Account chair = accounts.verified("Omondi");
             UUID chamaId = found(chair);
             UUID ownMembership = UUID.fromString(JsonPath.read(mvc.perform(chair.get("/api/v1/chamas/{id}/members/me", chamaId))
-                    .andReturn().getResponse().getContentAsString(), "$.membership.membershipId"));
+                    .andReturn().getResponse().getContentAsString(), "$.data.membership.membershipId"));
 
             mvc.perform(chair.put("/api/v1/chamas/{c}/members/{m}/roles", "{\"roles\":[\"MEMBER\"]}", chamaId, ownMembership))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("MEMBER_SELF_MANAGEMENT"));
+                    .andExpect(jsonPath("$.error.code").value("MEMBER_SELF_MANAGEMENT"));
         }
 
         @Test
@@ -256,7 +256,7 @@ class ChamaMembershipIntegrationTests {
             Account chair = accounts.verified("Wairimu");
             UUID chamaId = found(chair);
             UUID chairMembership = UUID.fromString(JsonPath.read(mvc.perform(chair.get("/api/v1/chamas/{id}/members/me", chamaId))
-                    .andReturn().getResponse().getContentAsString(), "$.membership.membershipId"));
+                    .andReturn().getResponse().getContentAsString(), "$.data.membership.membershipId"));
             Account secretary = accounts.verified("Sam");
             UUID secretaryMembership = activeMember(chair, chamaId, secretary);
 
@@ -268,7 +268,7 @@ class ChamaMembershipIntegrationTests {
 
             mvc.perform(secretary.put("/api/v1/chamas/{c}/members/{m}/roles", "{\"roles\":[\"MEMBER\"]}", chamaId, chairMembership))
                     .andExpect(status().isUnprocessableEntity())
-                    .andExpect(jsonPath("$.code").value("MEMBER_LAST_CHAIRPERSON"));
+                    .andExpect(jsonPath("$.error.code").value("MEMBER_LAST_CHAIRPERSON"));
         }
 
         @Test
@@ -281,7 +281,7 @@ class ChamaMembershipIntegrationTests {
             mvc.perform(chair.post("/api/v1/chamas/{c}/members/{m}/suspend", "{\"reason\":\"Missed three meetings\"}",
                             chamaId, membershipId))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("SUSPENDED"));
+                    .andExpect(jsonPath("$.data.status").value("SUSPENDED"));
             mvc.perform(member.get("/api/v1/chamas/{id}", chamaId)).andExpect(status().isForbidden());
 
             mvc.perform(chair.post("/api/v1/chamas/{c}/members/{m}/reactivate", chamaId, membershipId)).andExpect(status().isOk());
@@ -300,22 +300,22 @@ class ChamaMembershipIntegrationTests {
             activeMember(chair, chamaId, member);
             mvc.perform(chair.put("/api/v1/chamas/{id}/settings", standardSettingsJson().replace("\"approvalQuorum\":2", "\"approvalQuorum\":3"), chamaId))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.settings.approvalQuorum").value(3));
+                    .andExpect(jsonPath("$.data.settings.approvalQuorum").value(3));
 
             String log = mvc.perform(chair.get("/api/v1/chamas/{id}/audit-log", chamaId))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
 
-            List<String> actions = JsonPath.read(log, "$.content[*].action");
+            List<String> actions = JsonPath.read(log, "$.data[*].action");
             assertThat(actions).containsSubsequence(
                     "CHAMA_SETTINGS_CHANGED", "MEMBER_APPROVED", "MEMBER_INVITATION_ACCEPTED", "MEMBER_INVITED");
             assertThat(actions).contains("CHAMA_CREATED", "MEMBER_FOUNDER_ENROLLED");
 
-            List<Integer> before = JsonPath.read(log, "$.content[?(@.action=='CHAMA_SETTINGS_CHANGED')].details.before.approvalQuorum");
-            List<Integer> after = JsonPath.read(log, "$.content[?(@.action=='CHAMA_SETTINGS_CHANGED')].details.after.approvalQuorum");
+            List<Integer> before = JsonPath.read(log, "$.data[?(@.action=='CHAMA_SETTINGS_CHANGED')].details.before.approvalQuorum");
+            List<Integer> after = JsonPath.read(log, "$.data[?(@.action=='CHAMA_SETTINGS_CHANGED')].details.after.approvalQuorum");
             assertThat(before).containsExactly(2);
             assertThat(after).containsExactly(3);
-            List<String> acceptedBy = JsonPath.read(log, "$.content[?(@.action=='MEMBER_INVITATION_ACCEPTED')].actorUserId");
+            List<String> acceptedBy = JsonPath.read(log, "$.data[?(@.action=='MEMBER_INVITATION_ACCEPTED')].actorUserId");
             assertThat(acceptedBy).containsExactly(member.userId().toString());
         }
 
@@ -336,19 +336,19 @@ class ChamaMembershipIntegrationTests {
     private UUID found(Account founder) throws Exception {
         String body = mvc.perform(founder.post("/api/v1/chamas", "{\"name\":\"Chama of %s\"}".formatted(founder.email())))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        return UUID.fromString(JsonPath.read(body, "$.id"));
+        return UUID.fromString(JsonPath.read(body, "$.data.id"));
     }
 
     private UUID latestChamaOf(Account account) throws Exception {
         String body = mvc.perform(account.get("/api/v1/me/chamas")).andReturn().getResponse().getContentAsString();
-        List<String> ids = JsonPath.read(body, "$[*].chamaId");
+        List<String> ids = JsonPath.read(body, "$.data[*].chamaId");
         return UUID.fromString(ids.getLast());
     }
 
     private UUID invite(Account official, UUID chamaId, String email) throws Exception {
         String body = mvc.perform(official.post("/api/v1/chamas/{id}/members/invitations", "{\"email\":\"%s\"}".formatted(email), chamaId))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        return UUID.fromString(JsonPath.read(body, "$.membershipId"));
+        return UUID.fromString(JsonPath.read(body, "$.data.membershipId"));
     }
 
     /** Invite, accept and approve: returns the new member's membership ID. */

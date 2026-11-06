@@ -1,5 +1,7 @@
 package ke.chama.modules.member.presentation.controller;
 
+import ke.chama.shared.web.ApiResponse;
+import java.util.List;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.member.application.port.in.MemberViews.MemberView;
@@ -14,7 +16,6 @@ import ke.chama.shared.security.ChamaPermission;
 import ke.chama.shared.security.CurrentUser;
 import ke.chama.shared.security.RequiresChamaMembership;
 import ke.chama.shared.security.RequiresChamaPermission;
-import ke.chama.shared.web.PageResponse;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -62,67 +63,70 @@ class MemberController {
     @PostMapping("/invitations")
     @ResponseStatus(HttpStatus.CREATED)
     @RequiresChamaPermission(ChamaPermission.MEMBER_INVITE)
-    MemberView invite(@PathVariable UUID chamaId, @Valid @RequestBody InviteMemberRequest request) {
-        return commands.invite(chamaId, CurrentUser.id(), request.email());
+    ApiResponse<MemberView> invite(@PathVariable UUID chamaId, @Valid @RequestBody InviteMemberRequest request) {
+        return ApiResponse.ok(commands.invite(chamaId, CurrentUser.id(), request.email()), "Invitation sent");
     }
 
     /** Not permission-protected: the invitee is not a member yet. The service checks it is their invitation. */
     @PostMapping("/{membershipId}/accept")
-    MemberView accept(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
-        return commands.accept(chamaId, membershipId, CurrentUser.id());
+    ApiResponse<MemberView> accept(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
+        return ApiResponse.ok(commands.accept(chamaId, membershipId, CurrentUser.id()),
+                "Invitation accepted. A chama official will approve your membership.");
     }
 
     @PostMapping("/{membershipId}/decline")
-    MemberView decline(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
-        return commands.decline(chamaId, membershipId, CurrentUser.id());
+    ApiResponse<MemberView> decline(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
+        return ApiResponse.ok(commands.decline(chamaId, membershipId, CurrentUser.id()), "Invitation declined");
     }
 
     @PostMapping("/{membershipId}/approve")
     @RequiresChamaPermission(ChamaPermission.MEMBER_APPROVE)
-    MemberView approve(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
-        return commands.approve(chamaId, membershipId, CurrentUser.id());
+    ApiResponse<MemberView> approve(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
+        return ApiResponse.ok(commands.approve(chamaId, membershipId, CurrentUser.id()), "Member approved");
     }
 
     @PostMapping("/{membershipId}/reject")
     @RequiresChamaPermission(ChamaPermission.MEMBER_APPROVE)
-    MemberView reject(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
-        return commands.reject(chamaId, membershipId, CurrentUser.id());
+    ApiResponse<MemberView> reject(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
+        return ApiResponse.ok(commands.reject(chamaId, membershipId, CurrentUser.id()), "Membership request rejected");
     }
 
     @PostMapping("/{membershipId}/suspend")
     @RequiresChamaPermission(ChamaPermission.MEMBER_SUSPEND)
-    MemberView suspend(@PathVariable UUID chamaId, @PathVariable UUID membershipId,
-                       @Valid @RequestBody SuspendMemberRequest request) {
-        return commands.suspend(chamaId, membershipId, CurrentUser.id(), request.reason());
+    ApiResponse<MemberView> suspend(@PathVariable UUID chamaId, @PathVariable UUID membershipId,
+                                    @Valid @RequestBody SuspendMemberRequest request) {
+        return ApiResponse.ok(commands.suspend(chamaId, membershipId, CurrentUser.id(), request.reason()),
+                "Member suspended");
     }
 
     @PostMapping("/{membershipId}/reactivate")
     @RequiresChamaPermission(ChamaPermission.MEMBER_SUSPEND)
-    MemberView reactivate(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
-        return commands.reactivate(chamaId, membershipId, CurrentUser.id());
+    ApiResponse<MemberView> reactivate(@PathVariable UUID chamaId, @PathVariable UUID membershipId) {
+        return ApiResponse.ok(commands.reactivate(chamaId, membershipId, CurrentUser.id()), "Member reactivated");
     }
 
     @PutMapping("/{membershipId}/roles")
     @RequiresChamaPermission(ChamaPermission.MEMBER_ROLES_MANAGE)
-    MemberView changeRoles(@PathVariable UUID chamaId, @PathVariable UUID membershipId,
-                           @Valid @RequestBody ChangeRolesRequest request) {
-        return commands.changeRoles(chamaId, membershipId, CurrentUser.id(), request.roles());
+    ApiResponse<MemberView> changeRoles(@PathVariable UUID chamaId, @PathVariable UUID membershipId,
+                                        @Valid @RequestBody ChangeRolesRequest request) {
+        return ApiResponse.ok(commands.changeRoles(chamaId, membershipId, CurrentUser.id(), request.roles()),
+                "Roles updated");
     }
 
     @GetMapping
     @RequiresChamaPermission(ChamaPermission.MEMBER_VIEW)
-    PageResponse<MemberView> list(@PathVariable UUID chamaId,
-                                  @RequestParam(required = false) MembershipStatus status,
-                                  @RequestParam(defaultValue = "0") int page,
-                                  @RequestParam(defaultValue = "50") int size) {
+    ApiResponse<List<MemberView>> list(@PathVariable UUID chamaId,
+                                       @RequestParam(required = false) MembershipStatus status,
+                                       @RequestParam(defaultValue = "0") int page,
+                                       @RequestParam(defaultValue = "50") int size) {
         PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
                 Sort.by(Sort.Order.asc("memberNumber").nullsLast(), Sort.Order.asc("invitedAt")));
-        return PageResponse.from(queries.members(chamaId, status, pageable));
+        return ApiResponse.page(queries.members(chamaId, status, pageable));
     }
 
     @GetMapping("/me")
     @RequiresChamaMembership
-    MyMembershipView me(@PathVariable UUID chamaId) {
-        return queries.myMembership(chamaId, CurrentUser.id());
+    ApiResponse<MyMembershipView> me(@PathVariable UUID chamaId) {
+        return ApiResponse.ok(queries.myMembership(chamaId, CurrentUser.id()));
     }
 }

@@ -54,7 +54,7 @@ public final class TestAccounts {
         String email = register(firstName);
         String token = RecordingEmailSender.tokenFrom(emails.awaitEmail(email, s -> s.contains("Verify")));
         mvc.perform(post("/api/v1/auth/email/verify").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"token\":\"%s\"}".formatted(token))).andExpect(status().isNoContent());
+                .content("{\"token\":\"%s\"}".formatted(token))).andExpect(status().isOk());
         return login(email);
     }
 
@@ -66,10 +66,10 @@ public final class TestAccounts {
         String body = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, PASSWORD)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        String accessToken = JsonPath.read(body, "$.accessToken");
+        String accessToken = JsonPath.read(body, "$.data.accessToken");
         String me = mvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andReturn().getResponse().getContentAsString();
-        return new Account(email, UUID.fromString(JsonPath.read(me, "$.id")), accessToken);
+        return new Account(email, UUID.fromString(JsonPath.read(me, "$.data.id")), accessToken);
     }
 
     private String register(String firstName) throws Exception {

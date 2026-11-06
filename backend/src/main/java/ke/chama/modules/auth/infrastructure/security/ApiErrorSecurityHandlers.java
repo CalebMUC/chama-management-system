@@ -2,6 +2,8 @@ package ke.chama.modules.auth.infrastructure.security;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import ke.chama.shared.web.ApiError;
+import ke.chama.shared.web.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
@@ -11,28 +13,36 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthen
 import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 401/403 raised by the security filter chain happen before any controller, so
- * GlobalExceptionHandler never sees them. This writes the same ProblemDetail shape, on top of
- * the standard {@code WWW-Authenticate: Bearer ...} header Spring adds.
+ * GlobalExceptionHandler never sees them. This writes the same {@link ApiResponse} error shape,
+ * on top of the standard {@code WWW-Authenticate: Bearer ...} header Spring adds.
  */
-class ProblemDetailSecurityHandlers implements AuthenticationEntryPoint, AccessDeniedHandler {
+class ApiErrorSecurityHandlers implements AuthenticationEntryPoint, AccessDeniedHandler {
 
     private final BearerTokenAuthenticationEntryPoint bearerEntryPoint = new BearerTokenAuthenticationEntryPoint();
     private final BearerTokenAccessDeniedHandler bearerAccessDenied = new BearerTokenAccessDeniedHandler();
+    private final JsonMapper jsonMapper;
+
+    ApiErrorSecurityHandlers(JsonMapper jsonMapper) {
+        this.jsonMapper = jsonMapper;
+    }
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException exception) throws IOException {
         bearerEntryPoint.commence(request, response, exception);
         if (exception instanceof InvalidBearerTokenException) {
-            write(response, HttpStatus.UNAUTHORIZED, "AUTH_INVALID_ACCESS_TOKEN",
-                    "The access token is invalid or has expired");
+            write(request, response, HttpStatus.UNAUTHORIZED, "AUTH_INVALID_ACCESS_TOKEN",
+                    "Your session has expired or the access token is invalid. Log in again or refresh the token.");
         } else {
-            write(response, HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Authentication is required");
+            write(request, response, HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED",
+                    ApiError.defaultMessage(HttpStatus.UNAUTHORIZED));
         }
     }
 
@@ -40,16 +50,15 @@ class ProblemDetailSecurityHandlers implements AuthenticationEntryPoint, AccessD
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException exception) throws IOException {
         bearerAccessDenied.handle(request, response, exception);
-        write(response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "You do not have permission to perform this action");
+        write(request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", ApiError.defaultMessage(HttpStatus.FORBIDDEN));
     }
 
-    /** All values are constants, so a hand-built JSON string is safe here. */
-    private static void write(HttpServletResponse response, HttpStatus status, String code, String detail)
-            throws IOException {
+    private void write(HttpServletRequest request, HttpServletResponse response, HttpStatus status,
+                       String code, String message) throws IOException {
         response.setStatus(status.value());
-        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        response.getWriter().write("""
-                {"type":"about:blank","title":"%s","status":%d,"detail":"%s","code":"%s"}"""
-                .formatted(status.getReasonPhrase(), status.value(), detail, code));
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        ApiResponse<Void> body = ApiResponse.failure(message, ApiError.of(code, status, request.getRequestURI()));
+        jsonMapper.writeValue(response.getOutputStream(), body);
     }
 }

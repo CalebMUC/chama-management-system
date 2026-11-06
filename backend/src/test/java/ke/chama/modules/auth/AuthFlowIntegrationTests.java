@@ -53,11 +53,11 @@ class AuthFlowIntegrationTests {
 
             register("  " + email.toUpperCase() + " ", "0712 345 678")
                     .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.email").value(email))
-                    .andExpect(jsonPath("$.phoneNumber").value("+254712345678"))
-                    .andExpect(jsonPath("$.roles").value(hasItem("ROLE_USER")))
-                    .andExpect(jsonPath("$.createdAt").isString())
-                    .andExpect(jsonPath("$.password").doesNotExist())
+                    .andExpect(jsonPath("$.data.email").value(email))
+                    .andExpect(jsonPath("$.data.phoneNumber").value("+254712345678"))
+                    .andExpect(jsonPath("$.data.roles").value(hasItem("ROLE_USER")))
+                    .andExpect(jsonPath("$.data.createdAt").isString())
+                    .andExpect(jsonPath("$.data.password").doesNotExist())
                     .andExpect(content().string(not(containsString(PASSWORD))));
 
             assertThat(events.stream(UserRegisteredEvent.class))
@@ -84,7 +84,7 @@ class AuthFlowIntegrationTests {
 
             register(email.toUpperCase(), "0722000000")
                     .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.code").value("AUTH_USER_ALREADY_EXISTS"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_USER_ALREADY_EXISTS"));
         }
 
         @Test
@@ -93,17 +93,17 @@ class AuthFlowIntegrationTests {
                             {"email":"not-an-email","phoneNumber":"0712345678","password":"short",
                              "firstName":"","lastName":"Wanjiku"}"""))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                    .andExpect(jsonPath("$.errors[*].field").value(hasItem("email")))
-                    .andExpect(jsonPath("$.errors[*].field").value(hasItem("password")))
-                    .andExpect(jsonPath("$.errors[*].field").value(hasItem("firstName")));
+                    .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                    .andExpect(jsonPath("$.error.fields[*].field").value(hasItem("email")))
+                    .andExpect(jsonPath("$.error.fields[*].field").value(hasItem("password")))
+                    .andExpect(jsonPath("$.error.fields[*].field").value(hasItem("firstName")));
         }
 
         @Test
         void rejectsInvalidPhoneNumber() throws Exception {
             register(uniqueEmail(), "12345")
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("INVALID_PHONE_NUMBER"));
+                    .andExpect(jsonPath("$.error.code").value("INVALID_PHONE_NUMBER"));
         }
     }
 
@@ -116,10 +116,10 @@ class AuthFlowIntegrationTests {
 
             login(email, PASSWORD)
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                    .andExpect(jsonPath("$.expiresIn").value(900))
-                    .andExpect(jsonPath("$.accessToken").isString())
-                    .andExpect(jsonPath("$.refreshToken").isString());
+                    .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                    .andExpect(jsonPath("$.data.expiresIn").value(900))
+                    .andExpect(jsonPath("$.data.accessToken").isString())
+                    .andExpect(jsonPath("$.data.refreshToken").isString());
         }
 
         @Test
@@ -133,7 +133,9 @@ class AuthFlowIntegrationTests {
                     .andExpect(status().isUnauthorized())
                     .andReturn().getResponse().getContentAsString();
 
-            assertThat(wrongPassword).isEqualTo(unknownEmail).contains("AUTH_INVALID_CREDENTIALS");
+            // Identical apart from the server timestamp, so the response cannot reveal whether an account exists.
+            assertThat(withoutTimestamp(wrongPassword)).isEqualTo(withoutTimestamp(unknownEmail))
+                    .contains("AUTH_INVALID_CREDENTIALS");
         }
 
         @Test
@@ -143,7 +145,7 @@ class AuthFlowIntegrationTests {
 
             login(email, PASSWORD)
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_DISABLED"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_ACCOUNT_DISABLED"));
         }
     }
 
@@ -158,7 +160,7 @@ class AuthFlowIntegrationTests {
             login(email, PASSWORD)
                     .andExpect(status().isTooManyRequests())
                     .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
-                    .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_LOCKED"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_ACCOUNT_LOCKED"));
         }
 
         @Test
@@ -168,7 +170,7 @@ class AuthFlowIntegrationTests {
 
             login(ghost, PASSWORD)
                     .andExpect(status().isTooManyRequests())
-                    .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_LOCKED"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_ACCOUNT_LOCKED"));
         }
 
         @Test
@@ -221,16 +223,16 @@ class AuthFlowIntegrationTests {
 
             mvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.access()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.email").value(email));
+                    .andExpect(jsonPath("$.data.email").value(email));
         }
 
         @Test
-        void missingTokenIsUnauthorizedWithProblemDetail() throws Exception {
+        void missingTokenIsUnauthorizedWithErrorEnvelope() throws Exception {
             mvc.perform(get("/api/v1/auth/me"))
                     .andExpect(status().isUnauthorized())
                     .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, containsString("Bearer")))
-                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                    .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"));
         }
 
         @Test
@@ -240,7 +242,7 @@ class AuthFlowIntegrationTests {
 
             mvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + tampered))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.code").value("AUTH_INVALID_ACCESS_TOKEN"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_ACCESS_TOKEN"));
         }
 
         @Test
@@ -273,7 +275,7 @@ class AuthFlowIntegrationTests {
 
             refresh(stolen.refresh())
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.code").value("AUTH_INVALID_TOKEN"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_TOKEN"));
 
             refresh(rotated.refresh()).andExpect(status().isUnauthorized());
             refresh(otherDevice.refresh()).andExpect(status().isUnauthorized());
@@ -304,7 +306,7 @@ class AuthFlowIntegrationTests {
             Tokens phone = tokensFrom(login(email, PASSWORD));
             Tokens laptop = tokensFrom(login(email, PASSWORD));
 
-            logout(phone.refresh()).andExpect(status().isNoContent());
+            logout(phone.refresh()).andExpect(status().isOk());
 
             refresh(phone.refresh()).andExpect(status().isUnauthorized());
             refresh(laptop.refresh()).andExpect(status().isOk());
@@ -326,7 +328,7 @@ class AuthFlowIntegrationTests {
 
         @Test
         void isIdempotentForUnknownTokens() throws Exception {
-            logout("never-issued").andExpect(status().isNoContent());
+            logout("never-issued").andExpect(status().isOk());
         }
 
         @Test
@@ -336,7 +338,7 @@ class AuthFlowIntegrationTests {
             Tokens laptop = tokensFrom(login(email, PASSWORD));
 
             mvc.perform(post("/api/v1/auth/logout-all").header(HttpHeaders.AUTHORIZATION, "Bearer " + phone.access()))
-                    .andExpect(status().isNoContent());
+                    .andExpect(status().isOk());
 
             refresh(phone.refresh()).andExpect(status().isUnauthorized());
             refresh(laptop.refresh()).andExpect(status().isUnauthorized());
@@ -385,7 +387,7 @@ class AuthFlowIntegrationTests {
 
     private static Tokens tokensFrom(ResultActions result) throws Exception {
         String body = result.andReturn().getResponse().getContentAsString();
-        return new Tokens(JsonPath.read(body, "$.accessToken"), JsonPath.read(body, "$.refreshToken"));
+        return new Tokens(JsonPath.read(body, "$.data.accessToken"), JsonPath.read(body, "$.data.refreshToken"));
     }
 
     private String reasonFor(String rawRefreshToken) {
@@ -403,5 +405,9 @@ class AuthFlowIntegrationTests {
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    private static String withoutTimestamp(String json) {
+        return json.replaceAll("\"timestamp\":\"[^\"]*\"", "");
     }
 }

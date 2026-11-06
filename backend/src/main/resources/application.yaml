@@ -44,10 +44,6 @@ spring:
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
 
-  mvc:
-    problemdetails:
-      enabled: true
-
   # Local default is Mailpit from docker-compose (web UI: http://localhost:18025).
   mail:
     host: ${MAIL_HOST:localhost}

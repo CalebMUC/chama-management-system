@@ -1,5 +1,6 @@
 package ke.chama.modules.member.presentation.controller;
 
+import ke.chama.shared.web.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.member.application.port.in.RolePermissionAdmin;
@@ -38,14 +39,15 @@ class RoleController {
 
     @GetMapping
     @RequiresChamaPermission(ChamaPermission.MEMBER_VIEW)
-    Map<ChamaRole, Set<ChamaPermission>> list(@PathVariable UUID chamaId) {
-        return rolePermissions.permissionsByRole(chamaId);
+    ApiResponse<Map<ChamaRole, Set<ChamaPermission>>> list(@PathVariable UUID chamaId) {
+        return ApiResponse.ok(rolePermissions.permissionsByRole(chamaId));
     }
 
     @PutMapping("/{role}/permissions")
     @RequiresChamaPermission(ChamaPermission.ROLE_PERMISSIONS_MANAGE)
-    Set<ChamaPermission> update(@PathVariable UUID chamaId, @PathVariable ChamaRole role,
-                                @Valid @RequestBody RolePermissionsRequest request) {
-        return rolePermissions.updateRolePermissions(chamaId, CurrentUser.id(), role, request.permissions());
+    ApiResponse<Set<ChamaPermission>> update(@PathVariable UUID chamaId, @PathVariable ChamaRole role,
+                                             @Valid @RequestBody RolePermissionsRequest request) {
+        return ApiResponse.ok(rolePermissions.updateRolePermissions(chamaId, CurrentUser.id(), role,
+                request.permissions()), "Permissions updated");
     }
 }

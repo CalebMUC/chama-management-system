@@ -1,5 +1,6 @@
 package ke.chama.modules.member.presentation.controller;
 
+import ke.chama.shared.web.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import ke.chama.modules.member.application.port.in.MemberViews.InvitationView;
 import ke.chama.modules.member.application.port.in.MemberViews.MyChamaView;
@@ -29,12 +30,12 @@ class MyMembershipsController {
     }
 
     @GetMapping("/chamas")
-    List<MyChamaView> chamas() {
-        return queries.myChamas(CurrentUser.id());
+    ApiResponse<List<MyChamaView>> chamas() {
+        return ApiResponse.ok(queries.myChamas(CurrentUser.id()));
     }
 
     @GetMapping("/invitations")
-    List<InvitationView> invitations() {
-        return queries.myInvitations(CurrentUser.id());
+    ApiResponse<List<InvitationView>> invitations() {
+        return ApiResponse.ok(queries.myInvitations(CurrentUser.id()));
     }
 }

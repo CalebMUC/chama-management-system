@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Stateless API security. Every request carries a bearer access token; there is no server
@@ -41,8 +42,8 @@ class SecurityConfig {
     };
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
-        ProblemDetailSecurityHandlers handlers = new ProblemDetailSecurityHandlers();
+    SecurityFilterChain apiSecurity(HttpSecurity http, JsonMapper jsonMapper) throws Exception {
+        ApiErrorSecurityHandlers handlers = new ApiErrorSecurityHandlers(jsonMapper);
 
         http
                 .csrf(AbstractHttpConfigurer::disable)

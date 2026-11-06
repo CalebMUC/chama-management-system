@@ -37,6 +37,12 @@ class ApiDocsIntegrationTests {
                         .value("CHAMA_SETTINGS_MANAGE"))
                 .andExpect(jsonPath("$.paths['/api/v1/chamas/{chamaId}/audit-log'].get['x-chama-permission']")
                         .value("AUDIT_LOG_VIEW"))
-                .andExpect(jsonPath("$.paths.*.*.tags[*]", hasItem("Chamas")));
+                .andExpect(jsonPath("$.paths.*.*.tags[*]", hasItem("Chamas")))
+                // Errors use the shared envelope; 401 only where a token is needed, 403 only on chama rules.
+                .andExpect(jsonPath("$.components.schemas.ApiErrorResponse.properties.error").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/chamas/{chamaId}/settings'].put.responses['403']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/me'].get.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.responses['401']").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.responses['400']").exists());
     }
 }

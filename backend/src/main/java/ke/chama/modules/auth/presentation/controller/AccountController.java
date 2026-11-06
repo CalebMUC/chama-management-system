@@ -1,5 +1,6 @@
 package ke.chama.modules.auth.presentation.controller;
 
+import ke.chama.shared.web.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.auth.application.port.in.ChangePasswordUseCase;
@@ -22,10 +23,10 @@ import java.time.Clock;
 
 /**
  * <pre>
- * POST /api/v1/auth/email/verify          public  {token}                        204
+ * POST /api/v1/auth/email/verify          public  {token}                        200
  * POST /api/v1/auth/email/verify/resend   public  {email}                        202
  * POST /api/v1/auth/password/forgot       public  {email}                        202
- * POST /api/v1/auth/password/reset        public  {token, newPassword}           204
+ * POST /api/v1/auth/password/reset        public  {token, newPassword}           200
  * POST /api/v1/auth/password/change       bearer  {currentPassword, newPassword} 200 AuthResponse
  * </pre>
  * "resend" and "forgot" always answer 202 whether or not the email is registered, so they
@@ -52,33 +53,36 @@ class AccountController {
     }
 
     @PostMapping("/email/verify")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    void verifyEmail(@Valid @RequestBody TokenRequest request) {
+    ApiResponse<Void> verifyEmail(@Valid @RequestBody TokenRequest request) {
         emailVerification.verify(request.token());
+        return ApiResponse.message("Email verified");
     }
 
     @PostMapping("/email/verify/resend")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    void resendVerification(@Valid @RequestBody EmailRequest request) {
+    ApiResponse<Void> resendVerification(@Valid @RequestBody EmailRequest request) {
         emailVerification.requestVerification(request.email());
+        // Same answer whether or not the account exists, so emails cannot be probed.
+        return ApiResponse.message("If that email needs verifying, a new link is on its way");
     }
 
     @PostMapping("/password/forgot")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    void forgotPassword(@Valid @RequestBody EmailRequest request) {
+    ApiResponse<Void> forgotPassword(@Valid @RequestBody EmailRequest request) {
         passwordReset.requestReset(request.email());
+        return ApiResponse.message("If an account exists for that email, a reset link is on its way");
     }
 
     @PostMapping("/password/reset")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    ApiResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordReset.reset(request.token(), request.newPassword());
+        return ApiResponse.message("Password reset. Log in with your new password.");
     }
 
     @PostMapping("/password/change")
-    AuthResponse changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        return AuthResponse.from(
+    ApiResponse<AuthResponse> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        return ApiResponse.ok(AuthResponse.from(
                 changePassword.changePassword(CurrentUser.id(), request.currentPassword(), request.newPassword()),
-                clock.instant());
+                clock.instant()), "Password changed. Your other devices have been logged out.");
     }
 }

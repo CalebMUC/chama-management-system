@@ -1,5 +1,6 @@
 package ke.chama.modules.chama.presentation.controller;
 
+import ke.chama.shared.web.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.chama.application.port.in.ChamaUseCases;
@@ -42,20 +43,22 @@ class ChamaController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    ChamaResponse found(@Valid @RequestBody CreateChamaRequest request) {
-        return ChamaResponse.from(chamas.found(CurrentUser.id(), request.name(), request.description(),
-                request.currencyOrDefault(), request.settingsOrDefault()));
+    ApiResponse<ChamaResponse> found(@Valid @RequestBody CreateChamaRequest request) {
+        return ApiResponse.ok(ChamaResponse.from(chamas.found(CurrentUser.id(), request.name(), request.description(),
+                request.currencyOrDefault(), request.settingsOrDefault())), "Chama created");
     }
 
     @GetMapping("/{chamaId}")
     @RequiresChamaPermission(ChamaPermission.CHAMA_VIEW)
-    ChamaResponse get(@PathVariable UUID chamaId) {
-        return ChamaResponse.from(chamas.get(chamaId));
+    ApiResponse<ChamaResponse> get(@PathVariable UUID chamaId) {
+        return ApiResponse.ok(ChamaResponse.from(chamas.get(chamaId)));
     }
 
     @PutMapping("/{chamaId}/settings")
     @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
-    ChamaResponse changeSettings(@PathVariable UUID chamaId, @Valid @RequestBody ChamaSettingsRequest request) {
-        return ChamaResponse.from(chamas.changeSettings(chamaId, CurrentUser.id(), request.toSettings()));
+    ApiResponse<ChamaResponse> changeSettings(@PathVariable UUID chamaId,
+                                              @Valid @RequestBody ChamaSettingsRequest request) {
+        return ApiResponse.ok(ChamaResponse.from(chamas.changeSettings(chamaId, CurrentUser.id(), request.toSettings())),
+                "Settings updated");
     }
 }

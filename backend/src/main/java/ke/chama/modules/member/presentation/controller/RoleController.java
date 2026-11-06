@@ -1,5 +1,6 @@
 package ke.chama.modules.member.presentation.controller;
 
+import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.shared.web.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -18,17 +19,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * <pre>
- * GET /api/v1/chamas/{chamaId}/roles                      MEMBER_VIEW              role -> permissions
- * PUT /api/v1/chamas/{chamaId}/roles/{role}/permissions   ROLE_PERMISSIONS_MANAGE  {permissions}
+ * GET /api/v1/roles                      MEMBER_VIEW              role -> permissions
+ * PUT /api/v1/roles/{role}/permissions   ROLE_PERMISSIONS_MANAGE  {permissions}
  * </pre>
  */
 @Tag(name = "Roles & permissions", description = "Which permissions each role holds in a chama")
 @RestController
-@RequestMapping("/api/v1/chamas/{chamaId}/roles")
+@RequestMapping("/api/v1/roles")
 class RoleController {
 
     private final RolePermissionAdmin rolePermissions;
@@ -39,15 +39,15 @@ class RoleController {
 
     @GetMapping
     @RequiresChamaPermission(ChamaPermission.MEMBER_VIEW)
-    ApiResponse<Map<ChamaRole, Set<ChamaPermission>>> list(@PathVariable UUID chamaId) {
-        return ApiResponse.ok(rolePermissions.permissionsByRole(chamaId));
+    ApiResponse<Map<ChamaRole, Set<ChamaPermission>>> list() {
+        return ApiResponse.ok(rolePermissions.permissionsByRole(TenantContext.requireChama()));
     }
 
     @PutMapping("/{role}/permissions")
     @RequiresChamaPermission(ChamaPermission.ROLE_PERMISSIONS_MANAGE)
-    ApiResponse<Set<ChamaPermission>> update(@PathVariable UUID chamaId, @PathVariable ChamaRole role,
+    ApiResponse<Set<ChamaPermission>> update(@PathVariable ChamaRole role,
                                              @Valid @RequestBody RolePermissionsRequest request) {
-        return ApiResponse.ok(rolePermissions.updateRolePermissions(chamaId, CurrentUser.id(), role,
+        return ApiResponse.ok(rolePermissions.updateRolePermissions(TenantContext.requireChama(), CurrentUser.id(), role,
                 request.permissions()), "Permissions updated");
     }
 }

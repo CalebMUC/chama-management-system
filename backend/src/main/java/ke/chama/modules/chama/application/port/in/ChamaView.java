@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record ChamaView(UUID id,
+                        String code,
                         String name,
                         String description,
                         String currency,
@@ -16,7 +17,7 @@ public record ChamaView(UUID id,
                         ChamaSettings settings) {
 
     public static ChamaView from(Chama chama) {
-        return new ChamaView(chama.getId(), chama.getName(), chama.getDescription(),
+        return new ChamaView(chama.getId(), chama.getCode(), chama.getName(), chama.getDescription(),
                 chama.getCurrency().getCurrencyCode(), chama.getStatus().name(), chama.getCreatedBy(),
                 chama.getCreatedAt(), chama.getSettings());
     }

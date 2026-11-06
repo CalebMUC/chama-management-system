@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Plain JDBC for a simple (chama, role, permission) table and the one query that runs on
+ * Plain JDBC for a simple (tenant, role, permission) table and the one query that runs on
  * every protected request.
  */
 @Repository
@@ -32,12 +32,12 @@ class JdbcRolePermissionRepository implements RolePermissionRepository {
 
     @Override
     public void replace(UUID chamaId, ChamaRole role, Set<ChamaPermission> permissions) {
-        jdbc.update("delete from member.role_permissions where chama_id = ? and role = ?", chamaId, role.name());
+        jdbc.update("delete from member.role_permissions where tenant_id = ? and role = ?", chamaId, role.name());
         List<Object[]> rows = permissions.stream()
                 .map(p -> new Object[]{chamaId, role.name(), p.name()})
                 .toList();
         if (!rows.isEmpty()) {
-            jdbc.batchUpdate("insert into member.role_permissions (chama_id, role, permission) values (?, ?, ?)", rows);
+            jdbc.batchUpdate("insert into member.role_permissions (tenant_id, role, permission) values (?, ?, ?)", rows);
         }
     }
 
@@ -47,7 +47,7 @@ class JdbcRolePermissionRepository implements RolePermissionRepository {
         for (ChamaRole role : ChamaRole.values()) {
             result.put(role, EnumSet.noneOf(ChamaPermission.class));
         }
-        jdbc.query("select role, permission from member.role_permissions where chama_id = ?",
+        jdbc.query("select role, permission from member.role_permissions where tenant_id = ?",
                 rs -> {
                     Set<ChamaPermission> forRole = result.get(ChamaRole.valueOf(rs.getString("role")));
                     parse(rs.getString("permission")).ifPresent(forRole::add);
@@ -64,8 +64,8 @@ class JdbcRolePermissionRepository implements RolePermissionRepository {
                         select distinct rp.permission
                           from member.memberships m
                           join member.membership_roles mr on mr.membership_id = m.id
-                          join member.role_permissions rp on rp.chama_id = m.chama_id and rp.role = mr.role
-                         where m.chama_id = ? and m.user_id = ? and m.status = 'ACTIVE'""",
+                          join member.role_permissions rp on rp.tenant_id = m.tenant_id and rp.role = mr.role
+                         where m.tenant_id = ? and m.user_id = ? and m.status = 'ACTIVE'""",
                 rs -> {
                     parse(rs.getString("permission")).ifPresent(result::add);
                 },

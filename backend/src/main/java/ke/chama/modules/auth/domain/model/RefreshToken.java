@@ -1,5 +1,6 @@
 package ke.chama.modules.auth.domain.model;
 
+import org.hibernate.annotations.TenantId;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -24,6 +25,11 @@ public class RefreshToken {
     /**
      * Many refresh tokens can belong to one user: one per active session (phone, laptop).
      */
+    /** The chama this row belongs to. Set by Hibernate from the current tenant; never changes. */
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -65,6 +71,10 @@ public class RefreshToken {
 
     public UUID getId() {
         return id;
+    }
+
+    public UUID getTenantId() {
+        return tenantId;
     }
 
     public User getUser() {

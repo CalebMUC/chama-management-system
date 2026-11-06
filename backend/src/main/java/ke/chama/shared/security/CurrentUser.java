@@ -1,5 +1,6 @@
 package ke.chama.shared.security;
 
+import ke.chama.shared.tenancy.TenantContextFilter;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -39,7 +40,10 @@ public final class CurrentUser {
             Set<String> roles = token.getAuthorities().stream()
                     .map(GrantedAuthority::getAuthority)
                     .collect(Collectors.toUnmodifiableSet());
-            return Optional.of(new AuthenticatedUser(UUID.fromString(jwt.getSubject()), jwt.getClaimAsString("email"), roles));
+            String tenantId = jwt.getClaimAsString(TenantContextFilter.TENANT_ID_CLAIM);
+            return Optional.of(new AuthenticatedUser(UUID.fromString(jwt.getSubject()), jwt.getClaimAsString("email"),
+                    tenantId == null ? null : UUID.fromString(tenantId),
+                    jwt.getClaimAsString(TenantContextFilter.TENANT_CODE_CLAIM), roles));
         }
         return Optional.empty();
     }

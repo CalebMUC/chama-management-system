@@ -1,5 +1,10 @@
 package ke.chama.modules.auth;
 
+import ke.chama.RecordingEmailSender;
+import ke.chama.TestAccounts;
+import ke.chama.TestcontainersConfiguration.OwnerJdbc;
+import ke.chama.shared.tenancy.TenantContext;
+import org.junit.jupiter.api.BeforeEach;
 import com.jayway.jsonpath.JsonPath;
 import ke.chama.IntegrationTest;
 import ke.chama.modules.auth.domain.event.UserRegisteredEvent;
@@ -39,10 +44,25 @@ class AuthFlowIntegrationTests {
     MockMvc mvc;
 
     @Autowired
-    JdbcTemplate jdbc;
+    OwnerJdbc owner;
+
+    @Autowired
+    RecordingEmailSender emails;
 
     @Autowired
     ApplicationEvents events;
+
+    /** Direct SQL runs as the owner: the application role only ever sees one tenant's rows. */
+    JdbcTemplate jdbc;
+
+    /** Every test works in a chama of its own. */
+    String chama;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        jdbc = owner.jdbc();
+        chama = new TestAccounts(mvc, emails).newChama();
+    }
 
     @Nested
     class Registration {
@@ -60,9 +80,12 @@ class AuthFlowIntegrationTests {
                     .andExpect(jsonPath("$.data.password").doesNotExist())
                     .andExpect(content().string(not(containsString(PASSWORD))));
 
+            UUID chamaId = jdbc.queryForObject("select id from chama.chamas where code = ?", UUID.class, chama);
             assertThat(events.stream(UserRegisteredEvent.class))
                     .anySatisfy(e -> {
                         assertThat(e.email()).isEqualTo(email);
+                        assertThat(e.tenantId()).isEqualTo(chamaId);
+                        assertThat(e.selfRegistered()).isTrue();
                         assertThat(e.phoneNumber()).isEqualTo("+254712345678");
                         assertThat(e.eventId()).isNotNull();
                     });
@@ -88,8 +111,37 @@ class AuthFlowIntegrationTests {
         }
 
         @Test
-        void validatesRequestFields() throws Exception {
+        void theSameEmailCanHoldSeparateAccountsInDifferentChamas() throws Exception {
+            String email = uniqueEmail();
+            register(email, "0712345678").andExpect(status().isCreated());
+            String otherChama = new TestAccounts(mvc, emails).newChama();
+
+            register(otherChama, email, "0712345678").andExpect(status().isCreated());
+
+            assertThat(jdbc.queryForObject("select count(distinct tenant_id) from auth.users where email = ?",
+                    Integer.class, email)).isEqualTo(2);
+        }
+
+        @Test
+        void requiresTheChamaCode() throws Exception {
             mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+                            {"email":"%s","phoneNumber":"0712345678","password":"%s","firstName":"Jane","lastName":"W"}"""
+                            .formatted(uniqueEmail(), PASSWORD)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("TENANT_REQUIRED"));
+        }
+
+        @Test
+        void unknownChamaCodeIsNotFound() throws Exception {
+            register("no-such-chama", uniqueEmail(), "0712345678")
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error.code").value("TENANT_NOT_FOUND"));
+        }
+
+        @Test
+        void validatesRequestFields() throws Exception {
+            mvc.perform(post("/api/v1/auth/register").header(TenantContext.HEADER, chama)
+                    .contentType(MediaType.APPLICATION_JSON).content("""
                             {"email":"not-an-email","phoneNumber":"0712345678","password":"short",
                              "firstName":"","lastName":"Wanjiku"}"""))
                     .andExpect(status().isBadRequest())
@@ -136,6 +188,26 @@ class AuthFlowIntegrationTests {
             // Identical apart from the server timestamp, so the response cannot reveal whether an account exists.
             assertThat(withoutTimestamp(wrongPassword)).isEqualTo(withoutTimestamp(unknownEmail))
                     .contains("AUTH_INVALID_CREDENTIALS");
+        }
+
+        @Test
+        void accountsOnlyExistInTheirOwnChama() throws Exception {
+            String email = registered();
+            String otherChama = new TestAccounts(mvc, emails).newChama();
+
+            login(otherChama, email, PASSWORD)
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_CREDENTIALS"));
+        }
+
+        @Test
+        void theAccessTokenCarriesTheChama() throws Exception {
+            Tokens tokens = tokensFrom(login(registered(), PASSWORD));
+
+            mvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.access()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.chamaCode").value(chama))
+                    .andExpect(jsonPath("$.data.chamaId").isString());
         }
 
         @Test
@@ -188,6 +260,7 @@ class AuthFlowIntegrationTests {
             String email = registered();
             failLogins(email, 1);
             mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                            .header(TenantContext.HEADER, chama)
                             .header(HttpHeaders.USER_AGENT, "ChamaApp/1.0 (Android)")
                             .with(request -> {
                                 request.setRemoteAddr("196.201.214.10");
@@ -247,7 +320,7 @@ class AuthFlowIntegrationTests {
 
         @Test
         void otherEndpointsRequireAuthentication() throws Exception {
-            mvc.perform(get("/api/v1/chamas")).andExpect(status().isUnauthorized());
+            mvc.perform(get("/api/v1/members")).andExpect(status().isUnauthorized());
         }
     }
 
@@ -280,6 +353,18 @@ class AuthFlowIntegrationTests {
             refresh(rotated.refresh()).andExpect(status().isUnauthorized());
             refresh(otherDevice.refresh()).andExpect(status().isUnauthorized());
             assertThat(reasonFor(otherDevice.refresh())).isEqualTo("REUSE_DETECTED");
+        }
+
+        @Test
+        void aRefreshTokenOnlyWorksInItsOwnChama() throws Exception {
+            Tokens tokens = tokensFrom(login(registered(), PASSWORD));
+            String otherChama = new TestAccounts(mvc, emails).newChama();
+
+            mvc.perform(post("/api/v1/auth/refresh").header(TenantContext.HEADER, otherChama)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"%s\"}".formatted(tokens.refresh())))
+                    .andExpect(status().isUnauthorized());
+            refresh(tokens.refresh()).andExpect(status().isOk());
         }
 
         @Test
@@ -362,25 +447,37 @@ class AuthFlowIntegrationTests {
     }
 
     private ResultActions register(String email, String phone) throws Exception {
-        return mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+        return register(chama, email, phone);
+    }
+
+    private ResultActions register(String chamaCode, String email, String phone) throws Exception {
+        return mvc.perform(post("/api/v1/auth/register").header(TenantContext.HEADER, chamaCode)
+                .contentType(MediaType.APPLICATION_JSON).content("""
                 {"email":"%s","phoneNumber":"%s","password":"%s","firstName":"Jane","lastName":"Wanjiku"}"""
                 .formatted(email, phone, PASSWORD)));
     }
 
     private ResultActions login(String email, String password) throws Exception {
-        return mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+        return login(chama, email, password);
+    }
+
+    private ResultActions login(String chamaCode, String email, String password) throws Exception {
+        return mvc.perform(post("/api/v1/auth/login").header(TenantContext.HEADER, chamaCode)
+                .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"email":"%s","password":"%s"}""".formatted(email, password)));
     }
 
     private ResultActions refresh(String refreshToken) throws Exception {
-        return mvc.perform(post("/api/v1/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+        return mvc.perform(post("/api/v1/auth/refresh").header(TenantContext.HEADER, chama)
+                .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"refreshToken":"%s"}""".formatted(refreshToken)));
     }
 
     private ResultActions logout(String refreshToken) throws Exception {
-        return mvc.perform(post("/api/v1/auth/logout").contentType(MediaType.APPLICATION_JSON)
+        return mvc.perform(post("/api/v1/auth/logout").header(TenantContext.HEADER, chama)
+                .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"refreshToken":"%s"}""".formatted(refreshToken)));
     }

@@ -9,12 +9,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * The caller must be an ACTIVE member of the chama; no specific permission needed.
- * For "my own records" endpoints. The method must have a {@code UUID chamaId} parameter.
+ * The caller must be an ACTIVE member of their chama; no specific permission needed.
+ * For "my own records" endpoints.
  */
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@PreAuthorize("@chamaAccess.isActiveMember(#chamaId)")
+@PreAuthorize("@chamaAccess.isActiveMember()")
 public @interface RequiresChamaMembership {
 }

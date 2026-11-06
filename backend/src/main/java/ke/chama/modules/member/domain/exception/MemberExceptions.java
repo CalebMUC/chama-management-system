@@ -19,8 +19,7 @@ public final class MemberExceptions {
 
     public static class MemberAlreadyExistsException extends DomainException {
         public MemberAlreadyExistsException(String email) {
-            super("MEMBER_ALREADY_EXISTS", ErrorType.CONFLICT,
-                    email + " is already a member of this chama or has an open invitation");
+            super("MEMBER_ALREADY_EXISTS", ErrorType.CONFLICT, email + " already has an account in this chama");
         }
     }
 
@@ -39,17 +38,11 @@ public final class MemberExceptions {
         }
     }
 
-    public static class InvitationNotForYouException extends DomainException {
-        public InvitationNotForYouException() {
-            super("MEMBER_INVITATION_NOT_YOURS", ErrorType.FORBIDDEN,
-                    "This invitation was sent to a different email address");
-        }
-    }
-
-    public static class EmailVerificationRequiredException extends DomainException {
-        public EmailVerificationRequiredException() {
-            super("MEMBER_EMAIL_NOT_VERIFIED", ErrorType.FORBIDDEN,
-                    "Verify your email address before accepting an invitation");
+    /** The chama's licence allows this many active members; renew or upgrade it to add more. */
+    public static class MemberLimitReachedException extends DomainException {
+        public MemberLimitReachedException(int maxMembers) {
+            super("LICENSE_MEMBER_LIMIT_REACHED", ErrorType.BUSINESS_RULE,
+                    "Your chama's licence allows " + maxMembers + " active members. Upgrade the licence to approve more.");
         }
     }
 

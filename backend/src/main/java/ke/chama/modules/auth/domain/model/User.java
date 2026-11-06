@@ -1,5 +1,6 @@
 package ke.chama.modules.auth.domain.model;
 
+import org.hibernate.annotations.TenantId;
 import jakarta.persistence.*;
 import ke.chama.modules.auth.domain.event.UserRegisteredEvent;
 import ke.chama.shared.domain.AggregateRoot;
@@ -28,8 +29,19 @@ public class User extends AggregateRoot {
     @Id
     private UUID id;
 
-    /** Stored trimmed and lower-cased, so "Jane@Mail.com" and "jane@mail.com" are one account. */
-    @Column(nullable = false, unique = true)
+    /**
+     * The chama this user belongs to; every user belongs to exactly one. Platform administrators
+     * belong to the platform tenant. Hibernate checks it matches the current tenant on insert.
+     */
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
+    /**
+     * Stored trimmed and lower-cased, so "Jane@Mail.com" and "jane@mail.com" are one account.
+     * Unique within the chama: the same person may hold separate accounts in different chamas.
+     */
+    @Column(nullable = false)
     private String email;
 
     /** E.164 format (+2547XXXXXXXX). Needed for M-Pesa and SMS notifications. */
@@ -70,8 +82,9 @@ public class User extends AggregateRoot {
     protected User() {
     }
 
-    public User(String email, String phoneNumber, String passwordHash, String firstName, String lastName) {
+    public User(UUID tenantId, String email, String phoneNumber, String passwordHash, String firstName, String lastName) {
         this.id = UUID.randomUUID();
+        this.tenantId = java.util.Objects.requireNonNull(tenantId, "tenantId");
         this.email = normalizeEmail(email);
         this.phoneNumber = PhoneNumber.of(phoneNumber).value();
         this.password = requireText(passwordHash, "password");
@@ -79,13 +92,21 @@ public class User extends AggregateRoot {
         this.lastName = requireText(lastName, "lastName");
     }
 
-    /** Creates a new account with its default role and records {@link UserRegisteredEvent}. */
-    public static User register(String email, String phoneNumber, String passwordHash,
-                                String firstName, String lastName, Role defaultRole, Instant now) {
-        User user = new User(email, phoneNumber, passwordHash, firstName, lastName);
+    /**
+     * Creates a new account in {@code tenantId} with its default role and records
+     * {@link UserRegisteredEvent}.
+     *
+     * @param selfRegistered true when the person signed up themselves (they then apply for
+     *                       membership); false for accounts created by the system, such as a
+     *                       new chama's first administrator
+     */
+    public static User register(UUID tenantId, String email, String phoneNumber, String passwordHash,
+                                String firstName, String lastName, Role defaultRole, boolean selfRegistered,
+                                Instant now) {
+        User user = new User(tenantId, email, phoneNumber, passwordHash, firstName, lastName);
         user.addRole(defaultRole);
-        user.registerEvent(UserRegisteredEvent.of(
-                user.id, user.email, user.phoneNumber, user.firstName, user.lastName, now));
+        user.registerEvent(UserRegisteredEvent.of(tenantId, user.id, user.email, user.phoneNumber,
+                user.firstName, user.lastName, selfRegistered, now));
         return user;
     }
 
@@ -105,6 +126,10 @@ public class User extends AggregateRoot {
 
     public UUID getId() {
         return id;
+    }
+
+    public UUID getTenantId() {
+        return tenantId;
     }
 
     public String getEmail() {

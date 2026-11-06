@@ -1,5 +1,7 @@
 package ke.chama.modules.auth.infrastructure.security;
 
+import ke.chama.shared.tenancy.TenantContextFilter;
+import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.modules.auth.application.AuthProperties;
 import ke.chama.modules.auth.application.port.out.AccessTokenIssuer;
 import ke.chama.modules.auth.domain.model.Role;
@@ -49,6 +51,11 @@ class JwtAccessTokenIssuer implements AccessTokenIssuer {
                 .claim(EMAIL_CLAIM, user.getEmail())
                 .claim(EMAIL_VERIFIED_CLAIM, user.isEmailVerified())
                 .claim(ROLES_CLAIM, user.getRoles().stream().map(Role::getName).sorted().toList())
+                // The tenant always comes from the user record, never from the request.
+                .claim(TenantContextFilter.TENANT_ID_CLAIM, user.getTenantId().toString())
+                .claims(c -> TenantContext.code()
+                        .filter(code -> TenantContext.id().map(user.getTenantId()::equals).orElse(false))
+                        .ifPresent(code -> c.put(TenantContextFilter.TENANT_CODE_CLAIM, code)))
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

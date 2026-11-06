@@ -1,5 +1,9 @@
 package ke.chama.modules.auth;
 
+import ke.chama.TestAccounts;
+import ke.chama.TestcontainersConfiguration.OwnerJdbc;
+import ke.chama.shared.tenancy.TenantContext;
+import org.junit.jupiter.api.BeforeEach;
 import com.jayway.jsonpath.JsonPath;
 import ke.chama.IntegrationTest;
 import ke.chama.RecordingEmailSender;
@@ -32,10 +36,22 @@ class AccountRecoveryIntegrationTests {
     MockMvc mvc;
 
     @Autowired
-    JdbcTemplate jdbc;
+    OwnerJdbc owner;
 
     @Autowired
     RecordingEmailSender emails;
+
+    /** Direct SQL runs as the owner: the application role only ever sees one tenant's rows. */
+    JdbcTemplate jdbc;
+
+    /** Every test works in a chama of its own; public auth calls name it with X-Chama-Code. */
+    String chama;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        jdbc = owner.jdbc();
+        chama = new TestAccounts(mvc, emails).newChama();
+    }
 
     @Nested
     class EmailVerification {
@@ -44,7 +60,7 @@ class AccountRecoveryIntegrationTests {
         void registrationSendsALinkThatVerifiesTheEmail() throws Exception {
             String email = registered();
             EmailMessage message = emails.awaitEmail(email, s -> s.contains("Verify"));
-            assertThat(message.body()).contains("http://localhost:3000/verify-email?token=");
+            assertThat(message.body()).contains("http://localhost:3000/verify-email?chama=" + chama + "&token=");
 
             post("/api/v1/auth/email/verify", "{\"token\":\"%s\"}".formatted(RecordingEmailSender.tokenFrom(message)))
                     .andExpect(status().isOk());
@@ -108,7 +124,7 @@ class AccountRecoveryIntegrationTests {
 
             post("/api/v1/auth/password/forgot", "{\"email\":\"%s\"}".formatted(email)).andExpect(status().isAccepted());
             EmailMessage message = emails.awaitEmail(email, s -> s.contains("Reset"));
-            assertThat(message.body()).contains("http://localhost:3000/reset-password?token=");
+            assertThat(message.body()).contains("http://localhost:3000/reset-password?chama=" + chama + "&token=");
 
             post("/api/v1/auth/password/reset", """
                     {"token":"%s","newPassword":"%s"}""".formatted(RecordingEmailSender.tokenFrom(message), NEW_PASSWORD))
@@ -239,6 +255,7 @@ class AccountRecoveryIntegrationTests {
 
     private ResultActions post(String url, String json) throws Exception {
         return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(url)
+                .header(TenantContext.HEADER, chama)
                 .contentType(MediaType.APPLICATION_JSON).content(json));
     }
 

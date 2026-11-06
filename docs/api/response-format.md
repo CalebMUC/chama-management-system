@@ -5,6 +5,11 @@ checks one field, `success`, and then reads either `data` or `error`.
 
 Swagger UI (`http://localhost:8080/swagger-ui.html`) shows the exact `data` shape of each endpoint.
 
+Every chama is a tenant: a user belongs to exactly one chama. Public auth endpoints (register, login,
+refresh, logout, email verification, password reset) must send the chama's code in the `X-Chama-Code`
+header, e.g. `X-Chama-Code: mokica`; logged-in requests take the chama from the access token. Emailed
+links carry it as `?chama=<code>&token=...`. Platform administrators send no header.
+
 ## Shape
 
 | Field       | Present          | Meaning                                                                    |
@@ -141,6 +146,8 @@ Branch on `error.code`, never on `message`.
 | `UNAUTHENTICATED`           | 401    | No access token sent                                     |
 | `AUTH_INVALID_ACCESS_TOKEN` | 401    | Access token expired or invalid: refresh it, then retry  |
 | `ACCESS_DENIED`             | 403    | Missing chama permission, or not an active member        |
+| `TENANT_REQUIRED`           | 400    | A public chama endpoint was called without `X-Chama-Code` |
+| `TENANT_NOT_FOUND`          | 404    | `X-Chama-Code` names no chama: check the code            |
 | `NOT_FOUND`                 | 404    | Unknown URL                                              |
 | `METHOD_NOT_ALLOWED`        | 405    | Wrong HTTP method for the URL                            |
 | `UNSUPPORTED_MEDIA_TYPE`    | 415    | Body not sent as `application/json`                      |
@@ -162,17 +169,20 @@ Branch on `error.code`, never on `message`.
 | `AUTH_CURRENT_PASSWORD_INCORRECT` | 400    | Change password: current password wrong                     |
 | `AUTH_WEAK_PASSWORD`, `AUTH_PASSWORD_TOO_LONG`, `AUTH_INVALID_EMAIL`, `INVALID_PHONE_NUMBER` | 400 | Registration input rejected |
 
-**Chamas and members**
+**Chamas, licences and members**
 
 | Code                          | Status | When                                                          |
 |-------------------------------|--------|---------------------------------------------------------------|
 | `CHAMA_NOT_FOUND`             | 404    | No such chama                                                 |
-| `CHAMA_EMAIL_NOT_VERIFIED`    | 403    | Creating a chama needs a verified email                       |
+| `CHAMA_CODE_TAKEN`            | 409    | Registering a chama with a code that is already in use        |
+| `CHAMA_INVALID_CODE`          | 400    | Chama code malformed (3–30 letters, digits, hyphens) or reserved |
 | `CHAMA_INVALID_NAME`, `CHAMA_INVALID_DESCRIPTION`, `CHAMA_INVALID_SETTINGS` | 400 | Chama input rejected |
+| `LICENSE_EXPIRED`             | 403    | The chama's licence has expired; only viewing the chama, its licence and `members/me` still works |
+| `LICENSE_SUSPENDED`           | 403    | The platform provider suspended the licence                   |
+| `LICENSE_FEATURE_NOT_INCLUDED`| 403    | The licence's plan does not include this feature              |
+| `LICENSE_MEMBER_LIMIT_REACHED`| 422    | Approving another member would exceed the licence's member limit |
 | `MEMBER_NOT_FOUND`            | 404    | No such membership in this chama                              |
-| `MEMBER_ALREADY_EXISTS`       | 409    | That email is already a member or has a pending invitation    |
-| `MEMBER_INVITATION_NOT_YOURS` | 403    | Accepting or declining someone else's invitation              |
-| `MEMBER_EMAIL_NOT_VERIFIED`   | 403    | Accepting an invitation needs a verified email                |
+| `MEMBER_ALREADY_EXISTS`       | 409    | Inviting an email that already has an account in this chama   |
 | `MEMBER_SELF_MANAGEMENT`      | 403    | Officials cannot change their own roles or status             |
 | `MEMBER_INVALID_STATE`        | 422    | Action not allowed in the membership's current status         |
 | `MEMBER_LAST_CHAIRPERSON`     | 422    | The chama must keep at least one chairperson                  |

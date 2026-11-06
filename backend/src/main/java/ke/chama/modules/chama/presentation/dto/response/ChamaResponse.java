@@ -6,7 +6,9 @@ import ke.chama.modules.chama.domain.model.ChamaSettings;
 import java.time.Instant;
 import java.util.UUID;
 
+/** @param code the chama's unique code; members send it as {@code X-Chama-Code} to log in */
 public record ChamaResponse(UUID id,
+                            String code,
                             String name,
                             String description,
                             String currency,
@@ -36,7 +38,7 @@ public record ChamaResponse(UUID id,
     }
 
     public static ChamaResponse from(ChamaView view) {
-        return new ChamaResponse(view.id(), view.name(), view.description(), view.currency(), view.status(),
+        return new ChamaResponse(view.id(), view.code(), view.name(), view.description(), view.currency(), view.status(),
                 view.createdBy(), view.createdAt(), Settings.from(view.settings()));
     }
 }

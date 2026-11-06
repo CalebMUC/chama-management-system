@@ -49,7 +49,7 @@ class JdbcAuditLog implements AuditTrail, AuditLogQueries {
     public void record(AuditEntry entry) {
         jdbc.update("""
                         insert into audit.audit_log
-                            (id, chama_id, actor_user_id, action, target_type, target_id, details, ip_address, occurred_at)
+                            (id, tenant_id, actor_user_id, action, target_type, target_id, details, ip_address, occurred_at)
                         values (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)""",
                 UUID.randomUUID(), entry.chamaId(), entry.actorUserId(), entry.action(), entry.targetType(),
                 entry.targetId(), json.writeValueAsString(entry.details()), currentClientIp(),
@@ -59,7 +59,7 @@ class JdbcAuditLog implements AuditTrail, AuditLogQueries {
     @Override
     @Transactional(readOnly = true)
     public Page<AuditLogEntry> forChama(UUID chamaId, String action, Pageable pageable) {
-        StringBuilder where = new StringBuilder(" where chama_id = ?");
+        StringBuilder where = new StringBuilder(" where tenant_id = ?");
         List<Object> args = new ArrayList<>(List.of(chamaId));
         if (action != null && !action.isBlank()) {
             where.append(" and action = ?");

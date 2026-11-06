@@ -1,5 +1,7 @@
 package ke.chama.modules.auth.infrastructure.security;
 
+import io.swagger.v3.oas.models.parameters.HeaderParameter;
+import ke.chama.shared.tenancy.TenantContext;
 import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
@@ -59,13 +61,20 @@ class OpenApiConfig {
                         .description("""
                                 Contributions, loans, expenses and members for Kenyan chamas.
 
+                                **Chamas are tenants.** Every user belongs to exactly one chama, and sees \
+                                only that chama's data. Logged-in requests take the chama from the access \
+                                token. Public auth endpoints (register, login, refresh, password reset) name \
+                                the chama with the `X-Chama-Code` header, e.g. `X-Chama-Code: mokica`; \
+                                platform administrators omit it. Platform administrators add chamas with \
+                                `POST /api/v1/platform/chamas`.
+
                                 **Responses.** Every response, success or error, has the same shape:
                                 `{ success, message, data, meta?, error?, timestamp }`.
                                 Check `success`; on `true` read `data` (and `meta` for paged lists), on \
                                 `false` show `message` and use `error.code` to branch and `error.fields` \
                                 to mark invalid form fields. `message` is always safe to show to users.
 
-                                **Authorize.** Call `POST /api/v1/auth/login`, copy `data.accessToken` from the \
+                                **Authorize.** Call `POST /api/v1/auth/login` (with `X-Chama-Code`), copy `data.accessToken` from the \
                                 response and paste it into **Authorize** (no `Bearer ` prefix). Tokens last \
                                 15 minutes; use `POST /api/v1/auth/refresh` for a new one.
 
@@ -114,6 +123,13 @@ class OpenApiConfig {
                 boolean isPublic = publicPaths.contains(path);
                 if (isPublic) {
                     operation.setSecurity(List.of());
+                }
+                if (publicPaths.contains(path)) {
+                    operation.addParametersItem(new HeaderParameter()
+                            .name(TenantContext.HEADER)
+                            .description("Your chama's code, e.g. mokica. Omit only for platform administrators.")
+                            .required(false)
+                            .schema(new StringSchema().example("mokica")));
                 }
                 addErrorResponses(operation, !isPublic);
             }));

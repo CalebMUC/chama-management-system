@@ -1,5 +1,6 @@
 package ke.chama.modules.auth.domain.model;
 
+import org.hibernate.annotations.TenantId;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -20,6 +21,11 @@ public class LoginAttempt {
     private UUID id;
 
     /** Normalized email as typed; recorded even when no such user exists. */
+    /** The chama this row belongs to. Set by Hibernate from the current tenant; never changes. */
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
     @Column(nullable = false)
     private String email;
 
@@ -57,6 +63,10 @@ public class LoginAttempt {
 
     public UUID getId() {
         return id;
+    }
+
+    public UUID getTenantId() {
+        return tenantId;
     }
 
     public String getEmail() {

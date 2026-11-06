@@ -1,5 +1,6 @@
 package ke.chama.modules.audit.presentation.controller;
 
+import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.shared.web.ApiResponse;
 import java.util.List;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -9,13 +10,11 @@ import ke.chama.shared.security.ChamaPermission;
 import ke.chama.shared.security.RequiresChamaPermission;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
 
-/** GET /api/v1/chamas/{chamaId}/audit-log?action=&page=&size=   (AUDIT_LOG_VIEW) */
+/** GET /api/v1/audit-log?action=&page=&size=   (AUDIT_LOG_VIEW): the caller's chama only */
 @Tag(name = "Audit log", description = "Append-only record of who did what in a chama")
 @RestController
 class AuditLogController {
@@ -28,13 +27,12 @@ class AuditLogController {
         this.auditLog = auditLog;
     }
 
-    @GetMapping("/api/v1/chamas/{chamaId}/audit-log")
+    @GetMapping("/api/v1/audit-log")
     @RequiresChamaPermission(ChamaPermission.AUDIT_LOG_VIEW)
-    ApiResponse<List<AuditLogEntry>> list(@PathVariable UUID chamaId,
-                                          @RequestParam(required = false) String action,
+    ApiResponse<List<AuditLogEntry>> list(@RequestParam(required = false) String action,
                                           @RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "50") int size) {
         PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
-        return ApiResponse.page(auditLog.forChama(chamaId, action, pageable));
+        return ApiResponse.page(auditLog.forChama(TenantContext.requireChama(), action, pageable));
     }
 }

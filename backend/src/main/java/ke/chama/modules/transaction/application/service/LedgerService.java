@@ -6,6 +6,7 @@ import ke.chama.modules.auth.api.UserDirectory;
 import ke.chama.modules.transaction.api.EntrySide;
 import ke.chama.modules.transaction.api.Ledger;
 import ke.chama.modules.transaction.api.LedgerAccountKey;
+import ke.chama.modules.transaction.api.LedgerAccountSummary;
 import ke.chama.modules.transaction.api.PostingRequest;
 import ke.chama.modules.transaction.api.PostingRequest.PostingLine;
 import ke.chama.modules.transaction.application.port.in.LedgerUseCases;
@@ -50,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Currency;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -129,6 +131,16 @@ public class LedgerService implements Ledger, LedgerUseCases {
         }
         Totals totals = repository.accountTotals(chamaId, account.id(), memberUserId, null);
         return Money.of(account.balance(totals.debits(), totals.credits()), account.currency());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<LedgerAccountSummary> account(UUID chamaId, String code) {
+        if (code == null || code.isBlank()) {
+            return Optional.empty();
+        }
+        return repository.accountByCode(chamaId, code.trim().toUpperCase(Locale.ROOT))
+                .map(a -> new LedgerAccountSummary(a.code(), a.name(), a.type().name(), a.active()));
     }
 
     // ---- Use cases (for the API) -------------------------------------------------------------

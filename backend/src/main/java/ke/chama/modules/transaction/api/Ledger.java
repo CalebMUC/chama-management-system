@@ -2,6 +2,7 @@ package ke.chama.modules.transaction.api;
 
 import ke.chama.shared.domain.Money;
 
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -25,4 +26,7 @@ public interface Ledger {
 
     /** One member's balance on a member-ledger account, e.g. their savings. */
     Money memberBalance(UUID chamaId, UUID memberUserId, LedgerAccountKey account);
+
+    /** The account with this code in the chama's chart, if any. */
+    Optional<LedgerAccountSummary> account(UUID chamaId, String code);
 }

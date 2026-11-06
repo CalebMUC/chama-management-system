@@ -244,3 +244,17 @@ Branch on `error.code`, never on `message`.
 | `LOAN_DUPLICATE_REFERENCE`      | 409    | That M-Pesa code or bank slip has already been used for a loan |
 | `LOAN_NOT_ELIGIBLE`             | 422    | More than the limit (a multiple of savings), too short a membership, no savings, not active, or another loan still in progress. The message lists every reason |
 | `LOAN_INSUFFICIENT_FUNDS`       | 422    | The account the loan is paid from does not hold enough         |
+
+**Expenses** (need the `EXPENSES` licence feature)
+
+| Code                          | Status | When                                                          |
+|-------------------------------|--------|---------------------------------------------------------------|
+| `EXPENSE_INVALID`             | 400    | Zero amount, no payee or description, a future date, a rejection without a reason, or an M-Pesa/bank payment without its reference |
+| `EXPENSE_ACCOUNT_INVALID`     | 400    | The account code does not exist, is not an expense account, or is inactive |
+| `EXPENSE_SELF_APPROVAL`       | 403    | Whoever recorded the expense approving or rejecting it          |
+| `EXPENSE_NOT_REQUESTER`       | 403    | Someone other than whoever recorded it cancelling it            |
+| `EXPENSE_NOT_FOUND`           | 404    | No such expense in this chama                                   |
+| `EXPENSE_WRONG_STATUS`        | 409    | The step does not fit the status, e.g. paying before approval or paying twice |
+| `EXPENSE_ALREADY_APPROVED`    | 409    | The same official approving twice                               |
+| `EXPENSE_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been used for an expense |
+| `EXPENSE_INSUFFICIENT_FUNDS`  | 422    | The account the expense is paid from does not hold enough       |

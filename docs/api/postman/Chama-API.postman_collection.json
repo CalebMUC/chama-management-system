@@ -145,6 +145,11 @@
       "type": "string"
     },
     {
+      "key": "expenseId",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "accountId",
       "value": "",
       "type": "string"
@@ -2266,6 +2271,297 @@
         }
       ],
       "description": "Needs the LOANS licence feature. Member requests use {{memberToken}}; decisions use {{officialToken}}."
+    },
+    {
+      "name": "Expenses",
+      "item": [
+        {
+          "name": "Record an expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 300000,\n  \"payee\": \"Community Hall\",\n  \"description\": \"Hall hire for the AGM\",\n  \"accountCode\": \"5000\",\n  \"incurredOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Treasurer (EXPENSE_CREATE). Awaits approval by the quorum of officials other than the requester."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('expenseId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List expenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING_APPROVAL",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Every member can see every expense."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('expenseId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Spending summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/summary?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-11-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-11-30",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Defaults to this month."
+          }
+        },
+        {
+          "name": "One expense",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Agreed at the meeting\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Chairperson or secretary by default (EXPENSE_APPROVE); not whoever recorded it."
+          }
+        },
+        {
+          "name": "Reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Members bring lunch\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}",
+                "cancel"
+              ]
+            },
+            "description": "Only whoever recorded it."
+          }
+        },
+        {
+          "name": "Pay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"MPESA\",\n  \"reference\": \"QKEXP{{$timestamp}}\",\n  \"paidOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Posts Dr the expense account, Cr cash/bank/M-Pesa. The account must hold enough."
+          }
+        }
+      ],
+      "description": "Needs the EXPENSES licence feature. Requests use {{officialToken}}: log in as the right official."
     },
     {
       "name": "Ledger",

@@ -113,6 +113,12 @@ public class ChamaService implements ChamaUseCases, ChamaDirectory {
         });
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Integer> approvalQuorum(UUID chamaId) {
+        return chamas.findById(chamaId).map(c -> c.getSettings().approvalQuorum());
+    }
+
     private Chama load(UUID chamaId) {
         return chamas.findById(chamaId).orElseThrow(() -> new ChamaNotFoundException(chamaId));
     }

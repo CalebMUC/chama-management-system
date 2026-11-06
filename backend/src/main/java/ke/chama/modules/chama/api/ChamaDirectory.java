@@ -19,4 +19,7 @@ public interface ChamaDirectory {
 
     /** The chama's current loan policy (limit, interest, guarantors, approval quorum). */
     Optional<LoanRules> loanRules(UUID chamaId);
+
+    /** How many distinct officials must approve a loan or an expense. */
+    Optional<Integer> approvalQuorum(UUID chamaId);
 }

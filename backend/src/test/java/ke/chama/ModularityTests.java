@@ -19,7 +19,7 @@ class ModularityTests {
     void detectsEveryBusinessModule() {
         assertThat(modules.stream().map(ApplicationModule::getIdentifier).map(Object::toString))
                 .containsExactlyInAnyOrder(
-                        "shared", "auth", "chama", "member", "contribution", "loan", "penalty",
+                        "shared", "auth", "audit", "chama", "member", "contribution", "loan", "penalty",
                         "expense", "investment", "transaction", "notification", "report");
     }
 

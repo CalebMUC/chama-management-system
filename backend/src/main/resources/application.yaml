@@ -78,6 +78,8 @@ spring:
 
 chama:
   time-zone: Africa/Nairobi
+  # Where emailed links point (verification, password reset, invitations).
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
   auth:
     issuer: chama-backend
     # The default is for local development only. Every deployed environment must set
@@ -93,7 +95,7 @@ chama:
       duration: 15m
     links:
       # Emailed links open the frontend, which posts the token back to the API.
-      frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+      frontend-base-url: ${chama.frontend-base-url}
       email-verification-ttl: 24h
       password-reset-ttl: 30m
       resend-interval: 60s

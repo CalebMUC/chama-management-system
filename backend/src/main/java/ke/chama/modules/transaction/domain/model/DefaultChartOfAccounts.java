@@ -14,7 +14,8 @@ import static ke.chama.modules.transaction.domain.model.AccountType.*;
  * The accounts every chama starts with. Codes follow the usual numbering: 1xxx assets,
  * 2xxx liabilities, 3xxx equity, 4xxx income, 5xxx expenses.
  * <p>
- * Migration V10 backfilled this same chart for chamas created before the ledger existed.
+ * Migrations backfilled this chart for chamas created before the ledger existed (V10) and added
+ * later accounts to existing chamas (V13: Penalties receivable).
  */
 public final class DefaultChartOfAccounts {
 
@@ -26,6 +27,7 @@ public final class DefaultChartOfAccounts {
             new Template("1010", "Bank account", ASSET, BANK, false),
             new Template("1020", "Mobile money (M-Pesa)", ASSET, MOBILE_MONEY, false),
             new Template("1100", "Loans receivable", ASSET, LOANS_RECEIVABLE, true),
+            new Template("1110", "Penalties receivable", ASSET, PENALTIES_RECEIVABLE, true),
             new Template("1200", "Investments", ASSET, INVESTMENTS, false),
             new Template("2000", "Member savings", LIABILITY, MEMBER_SAVINGS, true),
             new Template("3000", "Retained surplus", EQUITY, RETAINED_SURPLUS, false),

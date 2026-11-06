@@ -95,6 +95,7 @@ public final class LedgerViews {
     }
 
     /** The caller's own position in their chama. */
-    public record MemberBalancesView(UUID memberUserId, String currency, long savingsMinor, long loansOutstandingMinor) {
+    public record MemberBalancesView(UUID memberUserId, String currency, long savingsMinor, long loansOutstandingMinor,
+                                     long penaltiesOutstandingMinor) {
     }
 }

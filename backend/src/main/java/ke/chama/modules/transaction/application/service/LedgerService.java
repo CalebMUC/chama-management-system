@@ -272,8 +272,9 @@ public class LedgerService implements Ledger, LedgerUseCases {
     public MemberBalancesView memberBalances(UUID chamaId, UUID memberUserId) {
         Money savings = memberBalance(chamaId, memberUserId, LedgerAccountKey.MEMBER_SAVINGS);
         Money loans = memberBalance(chamaId, memberUserId, LedgerAccountKey.LOANS_RECEIVABLE);
+        Money penalties = memberBalance(chamaId, memberUserId, LedgerAccountKey.PENALTIES_RECEIVABLE);
         return new MemberBalancesView(memberUserId, savings.currency().getCurrencyCode(), savings.minorUnits(),
-                loans.minorUnits());
+                loans.minorUnits(), penalties.minorUnits());
     }
 
     // ---- helpers ------------------------------------------------------------------------------

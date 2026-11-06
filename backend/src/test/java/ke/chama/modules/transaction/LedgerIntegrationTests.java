@@ -67,8 +67,8 @@ class LedgerIntegrationTests {
 
             mvc.perform(chama.chair().get("/api/v1/ledger/accounts"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.length()").value(13))
-                    .andExpect(jsonPath("$.data[*].code").value(hasItems("1000", "1010", "1020", "1100", "2000", "4000", "5000")))
+                    .andExpect(jsonPath("$.data.length()").value(14))
+                    .andExpect(jsonPath("$.data[*].code").value(hasItems("1000", "1010", "1020", "1100", "1110", "2000", "4000", "5000")))
                     .andExpect(jsonPath("$.data[?(@.code=='2000')].memberLedger").value(true))
                     .andExpect(jsonPath("$.data[?(@.code=='2000')].type").value("LIABILITY"))
                     .andExpect(jsonPath("$.data[*].balanceMinor").value(org.hamcrest.Matchers.everyItem(

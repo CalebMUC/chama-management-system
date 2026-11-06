@@ -11,6 +11,8 @@ public enum LedgerAccountKey {
     MOBILE_MONEY,
     /** Per member: what each member owes on loans. */
     LOANS_RECEIVABLE,
+    /** Per member: penalties and fines a member owes. */
+    PENALTIES_RECEIVABLE,
     INVESTMENTS,
     // Liabilities
     /** Per member: what the chama owes each member (their savings). */

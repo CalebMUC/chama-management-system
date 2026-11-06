@@ -1,5 +1,6 @@
 package ke.chama.modules.chama.infrastructure.persistence;
 
+import ke.chama.modules.chama.api.ChamaRegistry;
 import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.shared.tenancy.TenantResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,7 +15,7 @@ import java.util.UUID;
  * because the lookup itself is what decides the tenant; it reads only the id.
  */
 @Component
-class JdbcTenantResolver implements TenantResolver {
+class JdbcTenantResolver implements TenantResolver, ChamaRegistry {
 
     private final JdbcTemplate jdbc;
 
@@ -30,5 +31,11 @@ class JdbcTenantResolver implements TenantResolver {
         String normalized = code.trim().toLowerCase(Locale.ROOT);
         return TenantContext.callAsSystem(() -> jdbc.query("select id from chama.chamas where code = ?",
                 (rs, i) -> rs.getObject("id", UUID.class), normalized).stream().findFirst());
+    }
+
+    @Override
+    public java.util.List<UUID> activeChamaIds() {
+        return TenantContext.callAsSystem(() -> jdbc.query("select id from chama.chamas where status = 'ACTIVE' order by created_at",
+                (rs, i) -> rs.getObject("id", UUID.class)));
     }
 }

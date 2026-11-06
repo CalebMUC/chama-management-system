@@ -1,5 +1,6 @@
 package ke.chama.modules.contribution.application.service;
 
+import ke.chama.modules.contribution.api.LateContributions;
 import ke.chama.modules.audit.api.AuditEntry;
 import ke.chama.modules.audit.api.AuditTrail;
 import ke.chama.modules.auth.api.UserDirectory;
@@ -68,7 +69,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
-public class ContributionService implements ContributionUseCases {
+public class ContributionService implements ContributionUseCases, LateContributions {
 
     static final String SOURCE_TYPE = "CONTRIBUTION";
     static final String AUDIT_TARGET = "CONTRIBUTION";
@@ -238,6 +239,26 @@ public class ContributionService implements ContributionUseCases {
         List<PaymentView> recent = repository.payments(chamaId, memberUserId, null, null, null,
                 PageRequest.of(0, RECENT_PAYMENTS)).map(p -> view(p, member)).getContent();
         return new MyContributionsView(standingView(member, standing, rules.currency()), periodViews, recent);
+    }
+
+    // ---- LateContributions (for the penalty module) --------------------------------------------
+
+    @Override
+    public List<LateContribution> late(UUID chamaId) {
+        periods.bringUpToDate(chamaId, zone);
+        Book book = book(chamaId);
+        String currency = rules(chamaId).currency();
+        Set<UUID> seated = seatedById(chamaId).keySet();
+        List<LateContribution> late = new ArrayList<>();
+        book.standings.forEach((memberId, standing) -> {
+            if (!seated.contains(memberId)) {
+                return;
+            }
+            standing.periods().stream().filter(PeriodStanding::late).forEach(ps -> late.add(new LateContribution(
+                    memberId, ps.period().id(), ps.period().key(), ps.period().dueDate(), ps.outstandingMinor(), currency)));
+        });
+        late.sort(Comparator.comparing(LateContribution::dueDate).thenComparing(LateContribution::memberUserId));
+        return late;
     }
 
     // ---- standings ----------------------------------------------------------------------------

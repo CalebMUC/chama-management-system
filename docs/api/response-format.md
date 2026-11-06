@@ -215,3 +215,14 @@ Branch on `error.code`, never on `message`.
 | `CONTRIBUTION_PERIOD_NOT_FOUND`    | 404    | No such contribution period                                   |
 | `CONTRIBUTION_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been recorded       |
 | `CONTRIBUTION_ALREADY_REVERSED`    | 409    | The payment has already been reversed                         |
+
+**Penalties** (need the `PENALTIES` licence feature)
+
+| Code                          | Status | When                                                          |
+|-------------------------------|--------|---------------------------------------------------------------|
+| `PENALTY_INVALID`             | 400    | Zero or over-the-outstanding payment, a fine without a reason, a waiver without a reason, a future date, or an M-Pesa/bank payment without its reference |
+| `PENALTY_SELF_HANDLING`       | 403    | An official fining themselves, waiving their own penalty or recording their own payment |
+| `PENALTY_NOT_FOUND`           | 404    | No such penalty in this chama                                  |
+| `PENALTY_MEMBER_NOT_FOUND`    | 404    | The person is not an active or suspended member                |
+| `PENALTY_CLOSED`              | 409    | The penalty is already paid or waived                          |
+| `PENALTY_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been recorded for a penalty |

@@ -32,6 +32,8 @@ public enum ChamaPermission {
     LOAN_REPAYMENT_RECORD,
 
     PENALTY_VIEW_ALL,
+    /** Impose fines and record penalty payments. */
+    PENALTY_RECORD,
     PENALTY_WAIVE,
 
     EXPENSE_VIEW,

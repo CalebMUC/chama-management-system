@@ -13,4 +13,7 @@ public interface ChamaDirectory {
 
     /** The chama's licence; empty only for a chama created before licensing. */
     Optional<LicenseSummary> license(UUID chamaId);
+
+    /** The chama's current contribution rules (amount, frequency, due day, grace, late penalty). */
+    Optional<ContributionRules> contributionRules(UUID chamaId);
 }

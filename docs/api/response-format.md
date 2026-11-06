@@ -203,3 +203,15 @@ Branch on `error.code`, never on `message`.
 | `LEDGER_ALREADY_REVERSED`        | 409    | The entry has already been reversed                            |
 | `LEDGER_ACCOUNT_INACTIVE`        | 422    | Posting to a deactivated account                               |
 | `LEDGER_CANNOT_REVERSE_REVERSAL` | 422    | Reversing a reversal entry                                     |
+
+**Contributions** (need the `CONTRIBUTIONS` licence feature)
+
+| Code                               | Status | When                                                          |
+|------------------------------------|--------|---------------------------------------------------------------|
+| `CONTRIBUTION_INVALID_PAYMENT`     | 400    | Zero amount, future date, or an M-Pesa/bank payment without its reference |
+| `CONTRIBUTION_SELF_RECORDING`      | 403    | An official recording or reversing their own contribution     |
+| `CONTRIBUTION_MEMBER_NOT_FOUND`    | 404    | The person is not an active or suspended member               |
+| `CONTRIBUTION_NOT_FOUND`           | 404    | No such payment in this chama                                 |
+| `CONTRIBUTION_PERIOD_NOT_FOUND`    | 404    | No such contribution period                                   |
+| `CONTRIBUTION_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been recorded       |
+| `CONTRIBUTION_ALREADY_REVERSED`    | 409    | The payment has already been reversed                         |

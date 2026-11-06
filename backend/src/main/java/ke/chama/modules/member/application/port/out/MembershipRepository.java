@@ -26,6 +26,8 @@ public interface MembershipRepository {
 
     long countByChamaIdAndStatus(UUID chamaId, MembershipStatus status);
 
+    java.util.List<Membership> findByChamaIdAndStatusIn(UUID chamaId, java.util.Collection<MembershipStatus> statuses);
+
     long countActiveWithRole(UUID chamaId, ChamaRole role);
 
     int nextMemberNumber(UUID chamaId);

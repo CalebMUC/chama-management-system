@@ -4,6 +4,7 @@ import ke.chama.modules.audit.api.AuditEntry;
 import ke.chama.modules.audit.api.AuditTrail;
 import ke.chama.modules.chama.api.ChamaDirectory;
 import ke.chama.modules.chama.api.ChamaSummary;
+import ke.chama.modules.chama.api.ContributionRules;
 import ke.chama.modules.chama.api.LicenseSummary;
 import ke.chama.modules.chama.application.port.in.ChamaUseCases;
 import ke.chama.modules.chama.application.port.in.ChamaView;
@@ -87,6 +88,17 @@ public class ChamaService implements ChamaUseCases, ChamaDirectory {
         Instant now = clock.instant();
         return licenses.findByChamaId(chamaId).map(l -> new LicenseSummary(l.getPlan().name(),
                 l.stateAt(now).name(), l.getValidUntil(), l.getMaxMembers(), Set.copyOf(l.getFeatures())));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ContributionRules> contributionRules(UUID chamaId) {
+        return chamas.findById(chamaId).map(c -> {
+            ChamaSettings s = c.getSettings();
+            return new ContributionRules(s.contributionAmountMinor(), c.getCurrency().getCurrencyCode(),
+                    s.contributionFrequency().name(), s.contributionDueDay(), s.lateGraceDays(),
+                    s.latePenaltyBasisPoints());
+        });
     }
 
     private Chama load(UUID chamaId) {

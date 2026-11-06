@@ -6,6 +6,7 @@ import ke.chama.modules.chama.api.ChamaDirectory;
 import ke.chama.modules.chama.api.ChamaSummary;
 import ke.chama.modules.chama.api.ContributionRules;
 import ke.chama.modules.chama.api.LicenseSummary;
+import ke.chama.modules.chama.api.LoanRules;
 import ke.chama.modules.chama.application.port.in.ChamaUseCases;
 import ke.chama.modules.chama.application.port.in.ChamaView;
 import ke.chama.modules.chama.application.port.in.LicenseView;
@@ -98,6 +99,17 @@ public class ChamaService implements ChamaUseCases, ChamaDirectory {
             return new ContributionRules(s.contributionAmountMinor(), c.getCurrency().getCurrencyCode(),
                     s.contributionFrequency().name(), s.contributionDueDay(), s.lateGraceDays(),
                     s.latePenaltyBasisPoints());
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<LoanRules> loanRules(UUID chamaId) {
+        return chamas.findById(chamaId).map(c -> {
+            ChamaSettings s = c.getSettings();
+            return new LoanRules(c.getCurrency().getCurrencyCode(), s.loanMaxMultiplier(), s.loanInterestBasisPoints(),
+                    s.loanMinMembershipMonths(), s.loanGuarantorThresholdMinor(), s.loanGuarantorsRequired(),
+                    s.approvalQuorum());
         });
     }
 

@@ -226,3 +226,21 @@ Branch on `error.code`, never on `message`.
 | `PENALTY_MEMBER_NOT_FOUND`    | 404    | The person is not an active or suspended member                |
 | `PENALTY_CLOSED`              | 409    | The penalty is already paid or waived                          |
 | `PENALTY_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been recorded for a penalty |
+
+**Loans** (need the `LOANS` licence feature)
+
+| Code                            | Status | When                                                          |
+|---------------------------------|--------|---------------------------------------------------------------|
+| `LOAN_INVALID`                  | 400    | Zero amount, a term outside 1-36 months, no purpose, too few or repeated guarantors, guarantors on a loan that needs none, a rejection without a reason, a future date, an over-the-outstanding repayment, or an M-Pesa/bank transaction without its reference |
+| `LOAN_SELF_HANDLING`            | 403    | An official approving, rejecting, disbursing or recording repayments on their own loan |
+| `LOAN_GUARANTOR_CANNOT_APPROVE` | 403    | An official approving a loan they guarantee                    |
+| `LOAN_NOT_BORROWER`             | 403    | Someone other than the borrower cancelling or adding guarantors |
+| `LOAN_NOT_GUARANTOR`            | 403    | Answering a guarantee request you were not sent                |
+| `LOAN_NOT_FOUND`                | 404    | No such loan in this chama                                     |
+| `LOAN_MEMBER_NOT_FOUND`         | 404    | A guarantor is not an active member                            |
+| `LOAN_WRONG_STATUS`             | 409    | The step does not fit the loan's status, e.g. approving before guarantors accept, or disbursing twice |
+| `LOAN_ALREADY_APPROVED`         | 409    | The same official approving twice                              |
+| `LOAN_GUARANTOR_RESPONDED`      | 409    | A guarantor answering again                                    |
+| `LOAN_DUPLICATE_REFERENCE`      | 409    | That M-Pesa code or bank slip has already been used for a loan |
+| `LOAN_NOT_ELIGIBLE`             | 422    | More than the limit (a multiple of savings), too short a membership, no savings, not active, or another loan still in progress. The message lists every reason |
+| `LOAN_INSUFFICIENT_FUNDS`       | 422    | The account the loan is paid from does not hold enough         |

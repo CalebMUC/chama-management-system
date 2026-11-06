@@ -16,4 +16,7 @@ public interface ChamaDirectory {
 
     /** The chama's current contribution rules (amount, frequency, due day, grace, late penalty). */
     Optional<ContributionRules> contributionRules(UUID chamaId);
+
+    /** The chama's current loan policy (limit, interest, guarantors, approval quorum). */
+    Optional<LoanRules> loanRules(UUID chamaId);
 }

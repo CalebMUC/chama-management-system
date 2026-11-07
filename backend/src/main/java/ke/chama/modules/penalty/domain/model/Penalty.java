@@ -118,6 +118,22 @@ public final class Penalty {
                 today, imposedBy, null, 0, 0, Status.OUTSTANDING, null, null, null, null, now, 0);
     }
 
+    /** The source key of a penalty brought forward from earlier records: one per member. */
+    public static final String BROUGHT_FORWARD_KEY = "BROUGHT_FORWARD";
+
+    /** Penalties and fines a member still owed in the chama's earlier records, as one penalty. */
+    public static Penalty broughtForward(UUID chamaId, UUID memberUserId, long amountMinor, String currency,
+                                         LocalDate asOf, UUID importedBy, UUID openingEntryId, Instant now) {
+        if (amountMinor <= 0) {
+            throw new InvalidPenaltyException("A penalty brought forward must be greater than zero");
+        }
+        Penalty penalty = new Penalty(UUID.randomUUID(), chamaId, memberUserId, Kind.FINE, BROUGHT_FORWARD_KEY,
+                "Penalties brought forward from the chama's records as at " + asOf, amountMinor, currency, asOf,
+                importedBy, null, 0, 0, Status.OUTSTANDING, null, null, null, null, now, 0);
+        penalty.postedAs(openingEntryId);
+        return penalty;
+    }
+
     public void postedAs(UUID entryId) {
         this.assessmentEntryId = Objects.requireNonNull(entryId);
     }

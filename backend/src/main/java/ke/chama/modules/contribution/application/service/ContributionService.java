@@ -1,5 +1,6 @@
 package ke.chama.modules.contribution.application.service;
 
+import ke.chama.modules.contribution.api.ContributionCalendar;
 import ke.chama.modules.contribution.api.LateContributions;
 import ke.chama.modules.audit.api.AuditEntry;
 import ke.chama.modules.audit.api.AuditTrail;
@@ -56,6 +57,7 @@ import java.util.Comparator;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -69,7 +71,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
-public class ContributionService implements ContributionUseCases, LateContributions {
+public class ContributionService implements ContributionUseCases, LateContributions, ContributionCalendar {
 
     static final String SOURCE_TYPE = "CONTRIBUTION";
     static final String AUDIT_TARGET = "CONTRIBUTION";
@@ -373,5 +375,11 @@ public class ContributionService implements ContributionUseCases, LateContributi
         return new PaymentView(p.id(), p.memberUserId(), name, number, p.amountMinor(), p.currency(), p.method(),
                 p.reference(), p.paidOn(), p.notes(), p.status(), p.ledgerEntryId(), p.recordedBy(), p.recordedAt(),
                 p.reversedBy(), p.reversedAt(), p.reversalReason());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<LocalDate> earliestDueDate(UUID chamaId) {
+        return repository.periods(chamaId).stream().map(ContributionPeriod::dueDate).min(LocalDate::compareTo);
     }
 }

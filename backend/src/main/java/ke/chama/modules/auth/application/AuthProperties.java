@@ -67,7 +67,8 @@ public record AuthProperties(String issuer,
     public record Links(@DefaultValue("http://localhost:3000") String frontendBaseUrl,
                         @DefaultValue("24h") Duration emailVerificationTtl,
                         @DefaultValue("30m") Duration passwordResetTtl,
-                        @DefaultValue("60s") Duration resendInterval) {
+                        @DefaultValue("60s") Duration resendInterval,
+                        @DefaultValue("7d") Duration accountSetupTtl) {
         public Links {
             if (frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
                 throw new IllegalStateException("chama.auth.links.frontend-base-url must be set");
@@ -78,6 +79,7 @@ public record AuthProperties(String issuer,
             requirePositive(emailVerificationTtl, "links.email-verification-ttl");
             requirePositive(passwordResetTtl, "links.password-reset-ttl");
             Objects.requireNonNull(resendInterval, "links.resend-interval");
+            requirePositive(accountSetupTtl, "links.account-setup-ttl");
         }
     }
 

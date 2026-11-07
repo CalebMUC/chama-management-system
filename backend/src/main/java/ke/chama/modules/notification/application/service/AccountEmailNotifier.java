@@ -1,5 +1,6 @@
 package ke.chama.modules.notification.application.service;
 
+import ke.chama.modules.auth.domain.event.AccountSetupRequested;
 import ke.chama.modules.auth.domain.event.EmailVerificationRequested;
 import ke.chama.modules.auth.domain.event.PasswordChanged;
 import ke.chama.modules.auth.domain.event.PasswordResetRequested;
@@ -44,6 +45,26 @@ class AccountEmailNotifier {
 
                 If you did not create a Chama account, you can ignore this email.
                 """.formatted(event.firstName(), event.verificationUrl(), WHEN.format(event.expiresAt()))));
+    }
+
+    @ApplicationModuleListener
+    void on(AccountSetupRequested event) {
+        emailSender.send(new EmailMessage(event.email(), event.chamaName() + " is now on Chama: set your password", """
+                Hello %s,
+
+                %s now keeps its records in Chama. An account was created for you with this email
+                address, with your savings, loans and penalties brought forward from the chama's records.
+
+                Choose your password here:
+
+                %s
+
+                The link expires on %s and can only be used once. If it expires, use "Forgot password"
+                on the login page%s.
+
+                If you think this is a mistake, contact your chama's officials.
+                """.formatted(event.firstName(), event.chamaName(), event.setupUrl(), WHEN.format(event.expiresAt()),
+                event.chamaCode() == null ? "" : " (chama code: " + event.chamaCode() + ")")));
     }
 
     @ApplicationModuleListener

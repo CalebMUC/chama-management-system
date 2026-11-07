@@ -98,6 +98,7 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
     @Override
     public UserProfile register(RegisterUserCommand command) {
         User user = create(TenantContext.requireChama(), command, true);
+        accountLinks.sendEmailVerification(user, clock.instant());
         log.info("Registered user {} in chama {}", user.getId(), user.getTenantId());
         return UserProfile.from(user);
     }
@@ -108,6 +109,23 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
     public UserSummary createAccount(NewAccount account) {
         User user = create(TenantContext.requireId(), new RegisterUserCommand(account.email(), account.phoneNumber(),
                 account.password(), account.firstName(), account.lastName()), false);
+        accountLinks.sendEmailVerification(user, clock.instant());
+        return summary(user);
+    }
+
+    /** For other modules: an account whose owner chooses a password from a welcome email. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UserSummary importAccount(ImportedAccount account, String chamaName) {
+        // Nobody knows this password; the owner replaces it through the link in the welcome email.
+        String unknowable = OpaqueTokens.generate() + "Aa1";
+        User user = create(TenantContext.requireId(), new RegisterUserCommand(account.email(), account.phoneNumber(),
+                unknowable, account.firstName(), account.lastName()), false);
+        accountLinks.sendAccountSetup(user, chamaName, clock.instant());
+        return summary(user);
+    }
+
+    private static UserSummary summary(User user) {
         return new UserSummary(user.getId(), user.getEmail(), user.isEmailVerified(), user.getPhoneNumber(),
                 user.getFirstName(), user.getLastName(), user.isEnabled());
     }
@@ -127,7 +145,6 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
                 command.firstName(), command.lastName(), defaultRole, selfRegistered, now);
         users.save(user);
         user.pullDomainEvents().forEach(events::publishEvent);
-        accountLinks.sendEmailVerification(user, now);
         return user;
     }
 

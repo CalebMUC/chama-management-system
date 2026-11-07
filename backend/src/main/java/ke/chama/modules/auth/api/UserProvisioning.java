@@ -9,6 +9,16 @@ public interface UserProvisioning {
 
     UserSummary createAccount(NewAccount account);
 
+    /**
+     * An account for someone who has not chosen a password yet, e.g. a member imported from the
+     * chama's spreadsheets. Instead of a verification email they get a welcome email with a link
+     * to choose their password, which also confirms their email address.
+     */
+    UserSummary importAccount(ImportedAccount account, String chamaName);
+
+    record ImportedAccount(String email, String phoneNumber, String firstName, String lastName) {
+    }
+
     /** Password rules are the same as for self-registration. */
     record NewAccount(String email, String phoneNumber, String password, String firstName, String lastName) {
 

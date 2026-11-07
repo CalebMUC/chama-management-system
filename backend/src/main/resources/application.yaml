@@ -2,6 +2,12 @@ spring:
   application:
     name: chama-backend
 
+  # Opening-balance workbooks (.xlsx) are uploaded to the import endpoints.
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   # Defaults match infrastructure/docker/docker-compose.yml for local development.
   # Every deployed environment must set these through environment variables.
   datasource:
@@ -112,6 +118,8 @@ chama:
       frontend-base-url: ${chama.frontend-base-url}
       email-verification-ttl: 24h
       password-reset-ttl: 30m
+      # Welcome link for accounts created for someone else, e.g. imported members
+      account-setup-ttl: 7d
       resend-interval: 60s
   notification:
     mail-from: ${MAIL_FROM:Chama <no-reply@chama.local>}

@@ -169,6 +169,34 @@ public final class Loan {
                 null, null, null, null, null, null, null, 0, now, 0);
     }
 
+    /**
+     * A loan brought over from the chama's earlier records: already disbursed and partly repaid.
+     * Its repayment schedule continues from {@code disbursedOn}; the opening-balance entry is its
+     * disbursement entry.
+     */
+    public static Loan imported(UUID chamaId, UUID borrowerUserId, long principalMinor, long interestMinor,
+                                int termMonths, LocalDate disbursedOn, long repaidMinor, String purpose, String currency,
+                                UUID importedBy, UUID openingEntryId, Instant now) {
+        if (principalMinor <= 0 || interestMinor < 0) {
+            throw new InvalidLoanException("The principal must be greater than zero and the interest not negative");
+        }
+        if (termMonths < 1 || termMonths > MAX_TERM_MONTHS) {
+            throw new InvalidLoanException("The term must be between 1 and " + MAX_TERM_MONTHS + " months");
+        }
+        if (repaidMinor < 0 || repaidMinor >= principalMinor + interestMinor) {
+            throw new InvalidLoanException("What was repaid must be less than principal plus interest");
+        }
+        String why = purpose == null || purpose.isBlank() ? "Loan brought forward" : purpose.trim();
+        if (why.length() > MAX_TEXT_LENGTH) {
+            throw new InvalidLoanException("The purpose must be at most " + MAX_TEXT_LENGTH + " characters");
+        }
+        int interestBp = BigDecimal.valueOf(interestMinor).multiply(BigDecimal.valueOf(10_000))
+                .divide(BigDecimal.valueOf(principalMinor), 0, RoundingMode.HALF_UP).intValueExact();
+        return new Loan(UUID.randomUUID(), chamaId, borrowerUserId, principalMinor, interestBp, interestMinor, termMonths,
+                why, currency, disbursedOn, 0, 1, List.of(), List.of(), Status.ACTIVE, null, null, null, null, disbursedOn,
+                importedBy, null, null, Objects.requireNonNull(openingEntryId), repaidMinor, now, 0);
+    }
+
     // ---- guarantors -----------------------------------------------------------------------------
 
     /** The borrower names another guarantor, e.g. after one declined. */

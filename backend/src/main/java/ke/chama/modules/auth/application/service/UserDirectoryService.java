@@ -31,7 +31,8 @@ class UserDirectoryService implements UserDirectory {
 
     @Override
     public Optional<UserSummary> findByEmail(String email) {
-        if (email == null || email.isBlank()) {
+        // A malformed address cannot belong to anyone: nothing to find, nothing to complain about.
+        if (email == null || email.isBlank() || !email.contains("@")) {
             return Optional.empty();
         }
         return users.findByEmail(User.normalizeEmail(email)).map(UserDirectoryService::toSummary);

@@ -272,3 +272,15 @@ Branch on `error.code`, never on `message`.
 | `INVESTMENT_ALREADY_APPROVED`    | 409    | The same official approving twice                              |
 | `INVESTMENT_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been used for an investment |
 | `INVESTMENT_INSUFFICIENT_FUNDS`  | 422    | The account it is funded from does not hold enough             |
+
+**Imports** (opening balances from Excel; chairperson by default)
+
+| Code                  | Status | When                                                          |
+|-----------------------|--------|---------------------------------------------------------------|
+| `IMPORT_INVALID_FILE` | 400    | The upload is empty, not an .xlsx workbook, or unreadable      |
+| `IMPORT_ALREADY_DONE` | 409    | Opening balances were already imported for this chama          |
+| `IMPORT_HAS_PROBLEMS` | 422    | The file has errors. The preview lists each one with its sheet, row and column; nothing was imported |
+
+The preview (`POST /api/v1/imports/opening-balances/preview`) answers 200 even when the file has
+problems: `data.importable` is false and `data.problems` lists each one (`severity` ERROR or WARNING,
+`sheet`, `row`, `column`, `message`). Warnings do not stop an import.

@@ -47,6 +47,7 @@ public final class Expense {
     private final String payee;
     private final String description;
     private final String accountCode;
+    private final UUID investmentId;
     private final LocalDate incurredOn;
     private final UUID requestedBy;
     private final int requiredApprovals;
@@ -65,7 +66,7 @@ public final class Expense {
     private final long version;
 
     public Expense(UUID id, UUID chamaId, long amountMinor, String currency, String payee, String description,
-                   String accountCode, LocalDate incurredOn, UUID requestedBy, int requiredApprovals,
+                   String accountCode, UUID investmentId, LocalDate incurredOn, UUID requestedBy, int requiredApprovals,
                    List<Approval> approvals, Status status, UUID rejectedBy, Instant rejectedAt, String rejectionReason,
                    Instant cancelledAt, LocalDate paidOn, UUID paidBy, String paymentMethod, String paymentReference,
                    UUID paymentEntryId, Instant createdAt, long version) {
@@ -76,6 +77,7 @@ public final class Expense {
         this.payee = payee;
         this.description = description;
         this.accountCode = accountCode;
+        this.investmentId = investmentId;
         this.incurredOn = incurredOn;
         this.requestedBy = Objects.requireNonNull(requestedBy);
         this.requiredApprovals = requiredApprovals;
@@ -96,12 +98,13 @@ public final class Expense {
 
     /**
      * A new expense awaiting approval. The caller has checked that {@code accountCode} is an
-     * active expense account.
+     * active expense account and that {@code investmentId}, if any, is an active investment.
      *
      * @param requiredApprovals the chama's approval quorum when the expense was recorded
      */
     public static Expense request(UUID chamaId, UUID requestedBy, long amountMinor, String currency, String payee,
-                                  String description, String accountCode, LocalDate incurredOn, int requiredApprovals,
+                                  String description, String accountCode, UUID investmentId, LocalDate incurredOn,
+                                  int requiredApprovals,
                                   LocalDate today, Instant now) {
         if (amountMinor <= 0) {
             throw new InvalidExpenseException("The amount must be greater than zero");
@@ -112,7 +115,8 @@ public final class Expense {
         if (date.isAfter(today)) {
             throw new InvalidExpenseException("An expense cannot be dated in the future");
         }
-        return new Expense(UUID.randomUUID(), chamaId, amountMinor, currency, to, what, accountCode, date, requestedBy,
+        return new Expense(UUID.randomUUID(), chamaId, amountMinor, currency, to, what, accountCode, investmentId, date,
+                requestedBy,
                 Math.max(requiredApprovals, 1), List.of(), Status.PENDING_APPROVAL, null, null, null, null, null, null,
                 null, null, null, now, 0);
     }
@@ -218,6 +222,7 @@ public final class Expense {
     public String payee() { return payee; }
     public String description() { return description; }
     public String accountCode() { return accountCode; }
+    public UUID investmentId() { return investmentId; }
     public LocalDate incurredOn() { return incurredOn; }
     public UUID requestedBy() { return requestedBy; }
     public int requiredApprovals() { return requiredApprovals; }

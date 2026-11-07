@@ -9,6 +9,7 @@ import ke.chama.modules.expense.application.port.in.ExpenseUseCases.NewExpense;
 import ke.chama.modules.expense.application.port.in.ExpenseUseCases.Payment;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 public final class ExpenseRequests {
 
@@ -16,17 +17,19 @@ public final class ExpenseRequests {
     }
 
     /**
-     * @param accountCode an active expense account; defaults to 5000 Operating expenses
-     * @param incurredOn  defaults to today; cannot be in the future
+     * @param accountCode  an active expense account; defaults to 5000 Operating expenses
+     * @param investmentId the active investment the expense is for, e.g. the Airbnb's rent; optional
+     * @param incurredOn   defaults to today; cannot be in the future
      */
     public record ExpenseRequest(@NotNull @Positive Long amountMinor,
                                  @NotBlank @Size(max = 120) String payee,
                                  @NotBlank @Size(max = 300) String description,
                                  @Size(max = 10) String accountCode,
+                                 UUID investmentId,
                                  LocalDate incurredOn) {
 
         public NewExpense toCommand() {
-            return new NewExpense(amountMinor, payee, description, accountCode, incurredOn);
+            return new NewExpense(amountMinor, payee, description, accountCode, investmentId, incurredOn);
         }
     }
 

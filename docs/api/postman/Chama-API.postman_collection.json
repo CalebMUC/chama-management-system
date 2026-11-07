@@ -150,6 +150,11 @@
       "type": "string"
     },
     {
+      "key": "investmentId",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "accountId",
       "value": "",
       "type": "string"
@@ -2298,14 +2303,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"amountMinor\": 300000,\n  \"payee\": \"Community Hall\",\n  \"description\": \"Hall hire for the AGM\",\n  \"accountCode\": \"5000\",\n  \"incurredOn\": null\n}",
+              "raw": "{\n  \"amountMinor\": 300000,\n  \"payee\": \"Community Hall\",\n  \"description\": \"Hall hire for the AGM\",\n  \"accountCode\": \"5000\",\n  \"investmentId\": null,\n  \"incurredOn\": null\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Treasurer (EXPENSE_CREATE). Awaits approval by the quorum of officials other than the requester."
+            "description": "Treasurer (EXPENSE_CREATE). Awaits approval by the quorum of officials other than the requester. Set investmentId to charge it to an active investment, e.g. the Airbnb's rent."
           },
           "event": [
             {
@@ -2342,6 +2347,11 @@
                 {
                   "key": "status",
                   "value": "PENDING_APPROVAL",
+                  "disabled": true
+                },
+                {
+                  "key": "investmentId",
+                  "value": "{{investmentId}}",
                   "disabled": true
                 },
                 {
@@ -2562,6 +2572,453 @@
         }
       ],
       "description": "Needs the EXPENSES licence feature. Requests use {{officialToken}}: log in as the right official."
+    },
+    {
+      "name": "Investments",
+      "item": [
+        {
+          "name": "Propose an investment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sanlam money market fund\",\n  \"type\": \"MONEY_MARKET_FUND\",\n  \"institution\": \"Sanlam\",\n  \"description\": \"Surplus cash\",\n  \"amountMinor\": 5000000,\n  \"expectedReturnBasisPoints\": 1200,\n  \"maturityDate\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Treasurer (INVESTMENT_MANAGE). Types: MONEY_MARKET_FUND, FIXED_DEPOSIT, TREASURY_BILL, TREASURY_BOND, SACCO_SHARES, EQUITIES, LAND, BUSINESS, OTHER."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('investmentId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List investments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "MONEY_MARKET_FUND",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Every member can see every investment."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('investmentId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Portfolio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "portfolio"
+              ]
+            }
+          }
+        },
+        {
+          "name": "One investment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Agreed at the AGM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Chairperson or secretary by default (INVESTMENT_APPROVE); not whoever proposed it."
+          }
+        },
+        {
+          "name": "Reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Too risky\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "cancel"
+              ]
+            },
+            "description": "Only whoever proposed it."
+          }
+        },
+        {
+          "name": "Fund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/fund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "fund"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"MPESA\",\n  \"reference\": \"QKINV{{$timestamp}}\",\n  \"fundedOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Puts the approved amount in. The account must hold enough."
+          }
+        },
+        {
+          "name": "Deposit (top-up)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/deposits",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "deposits"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 1000000,\n  \"method\": \"MPESA\",\n  \"reference\": \"QKDEP{{$timestamp}}\",\n  \"depositedOn\": null,\n  \"note\": \"Airbnb bookings sent back to CIC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "More money into an active investment, e.g. topping up the money market fund. No new approval."
+          }
+        },
+        {
+          "name": "Record income",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/income",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "income"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 50000,\n  \"method\": \"REINVESTED\",\n  \"reference\": null,\n  \"receivedOn\": null,\n  \"note\": \"October interest\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "CASH, BANK, MPESA, or REINVESTED (stays in the investment and adds to its book value)."
+          }
+        },
+        {
+          "name": "Withdraw part",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/withdrawals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "withdrawals"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 1000000,\n  \"method\": \"MPESA\",\n  \"reference\": \"QKWD{{$timestamp}}\",\n  \"withdrawnOn\": null,\n  \"note\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Record a valuation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/valuations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "valuations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"valueMinor\": 5200000,\n  \"valuedOn\": null,\n  \"note\": \"October statement\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Informational: the books keep investments at cost until closed."
+          }
+        },
+        {
+          "name": "Close",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "close"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proceedsMinor\": 4300000,\n  \"method\": \"MPESA\",\n  \"reference\": \"QKCL{{$timestamp}}\",\n  \"closedOn\": null,\n  \"note\": \"Redeemed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Proceeds less book value is posted as a gain or loss to 4200 Investment income."
+          }
+        }
+      ],
+      "description": "Needs the INVESTMENTS licence feature."
     },
     {
       "name": "Ledger",

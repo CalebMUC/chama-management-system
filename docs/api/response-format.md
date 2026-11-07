@@ -251,6 +251,7 @@ Branch on `error.code`, never on `message`.
 |-------------------------------|--------|---------------------------------------------------------------|
 | `EXPENSE_INVALID`             | 400    | Zero amount, no payee or description, a future date, a rejection without a reason, or an M-Pesa/bank payment without its reference |
 | `EXPENSE_ACCOUNT_INVALID`     | 400    | The account code does not exist, is not an expense account, or is inactive |
+| `EXPENSE_INVESTMENT_INVALID`  | 400    | The investment the expense is charged to does not exist or is not active |
 | `EXPENSE_SELF_APPROVAL`       | 403    | Whoever recorded the expense approving or rejecting it          |
 | `EXPENSE_NOT_REQUESTER`       | 403    | Someone other than whoever recorded it cancelling it            |
 | `EXPENSE_NOT_FOUND`           | 404    | No such expense in this chama                                   |
@@ -258,3 +259,16 @@ Branch on `error.code`, never on `message`.
 | `EXPENSE_ALREADY_APPROVED`    | 409    | The same official approving twice                               |
 | `EXPENSE_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been used for an expense |
 | `EXPENSE_INSUFFICIENT_FUNDS`  | 422    | The account the expense is paid from does not hold enough       |
+
+**Investments** (need the `INVESTMENTS` licence feature)
+
+| Code                             | Status | When                                                          |
+|----------------------------------|--------|---------------------------------------------------------------|
+| `INVESTMENT_INVALID`             | 400    | No name or type, zero amount, a maturity date not in the future, a future date, a withdrawal of the whole book value (close instead), REINVESTED anywhere but income, or an M-Pesa/bank transaction without its reference |
+| `INVESTMENT_SELF_APPROVAL`       | 403    | Whoever proposed the investment approving or rejecting it      |
+| `INVESTMENT_NOT_PROPOSER`        | 403    | Someone other than whoever proposed it cancelling it           |
+| `INVESTMENT_NOT_FOUND`           | 404    | No such investment in this chama                               |
+| `INVESTMENT_WRONG_STATUS`        | 409    | The step does not fit the status, e.g. funding before approval, or income on a closed investment |
+| `INVESTMENT_ALREADY_APPROVED`    | 409    | The same official approving twice                              |
+| `INVESTMENT_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been used for an investment |
+| `INVESTMENT_INSUFFICIENT_FUNDS`  | 422    | The account it is funded from does not hold enough             |

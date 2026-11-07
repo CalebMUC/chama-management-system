@@ -28,13 +28,18 @@ public interface ExpenseUseCases {
     ExpenseView expense(UUID chamaId, UUID expenseId);
 
     /** Every filter is optional; dates filter on when the expense was incurred. Newest first. */
-    Page<ExpenseView> expenses(UUID chamaId, Expense.Status status, LocalDate from, LocalDate to, Pageable pageable);
+    Page<ExpenseView> expenses(UUID chamaId, Expense.Status status, UUID investmentId, LocalDate from, LocalDate to,
+                               Pageable pageable);
 
     /** What was paid out between two dates (inclusive, by payment date), per account, and what awaits payment. */
     SummaryView summary(UUID chamaId, LocalDate from, LocalDate to);
 
-    /** @param accountCode the expense account to charge; null means 5000 Operating expenses */
-    record NewExpense(long amountMinor, String payee, String description, String accountCode, LocalDate incurredOn) {
+    /**
+     * @param accountCode  the expense account to charge; null means 5000 Operating expenses
+     * @param investmentId the active investment the expense is for (e.g. an Airbnb's electricity); optional
+     */
+    record NewExpense(long amountMinor, String payee, String description, String accountCode, UUID investmentId,
+                      LocalDate incurredOn) {
     }
 
     record Payment(String method, String reference, LocalDate paidOn) {
@@ -51,6 +56,8 @@ public interface ExpenseUseCases {
                        String description,
                        String accountCode,
                        String accountName,
+                       UUID investmentId,
+                       String investmentName,
                        LocalDate incurredOn,
                        Expense.Status status,
                        UUID requestedBy,

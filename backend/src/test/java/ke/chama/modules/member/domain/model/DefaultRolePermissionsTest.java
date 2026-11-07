@@ -25,9 +25,9 @@ class DefaultRolePermissionsTest {
     }
 
     @Test
-    void secretaryHandlesMembershipAndApprovesExpensesButDoesNotHandleMoney() {
+    void secretaryHandlesMembershipAndApprovesSpendingButDoesNotHandleMoney() {
         assertThat(DefaultRolePermissions.forRole(ChamaRole.SECRETARY))
-                .contains(MEMBER_INVITE, AUDIT_LOG_VIEW, EXPENSE_APPROVE)
+                .contains(MEMBER_INVITE, AUDIT_LOG_VIEW, EXPENSE_APPROVE, INVESTMENT_APPROVE)
                 .doesNotContain(CONTRIBUTION_RECORD, LOAN_DISBURSE, MEMBER_ROLES_MANAGE);
     }
 

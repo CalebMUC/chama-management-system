@@ -22,6 +22,12 @@ public final class ExpenseExceptions {
         }
     }
 
+    public static class InvalidExpenseInvestmentException extends DomainException {
+        public InvalidExpenseInvestmentException(String message) {
+            super("EXPENSE_INVESTMENT_INVALID", ErrorType.VALIDATION, message);
+        }
+    }
+
     public static class ExpenseNotFoundException extends DomainException {
         public ExpenseNotFoundException() {
             super("EXPENSE_NOT_FOUND", ErrorType.NOT_FOUND, "Expense not found");

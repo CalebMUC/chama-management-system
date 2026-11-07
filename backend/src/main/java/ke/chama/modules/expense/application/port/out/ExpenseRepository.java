@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,7 +20,11 @@ public interface ExpenseRepository {
 
     Optional<Expense> expense(UUID chamaId, UUID expenseId);
 
-    Page<Expense> expenses(UUID chamaId, Expense.Status status, LocalDate from, LocalDate to, Pageable pageable);
+    Page<Expense> expenses(UUID chamaId, Expense.Status status, UUID investmentId, LocalDate from, LocalDate to,
+                           Pageable pageable);
+
+    /** Paid expenses per investment they were charged to. */
+    Map<UUID, Long> paidByInvestment(UUID chamaId);
 
     boolean referenceExists(UUID chamaId, String method, String reference);
 

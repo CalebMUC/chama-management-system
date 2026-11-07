@@ -41,7 +41,10 @@ public enum ChamaPermission {
     EXPENSE_APPROVE,
 
     INVESTMENT_VIEW,
+    /** Propose investments, fund them, and record income, withdrawals, valuations and closure. */
     INVESTMENT_MANAGE,
+    /** Approve or reject proposed investments (never your own proposal). */
+    INVESTMENT_APPROVE,
 
     LEDGER_VIEW,
     /** Post manual journal entries (opening balances, bank charges) and reverse entries. */

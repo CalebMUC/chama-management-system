@@ -15,8 +15,8 @@ import static ke.chama.shared.security.ChamaPermission.*;
  * afterwards, within the limits of {@link #LOCKED_FOR_CHAIRPERSON}.
  * <p>
  * Built for separation of duties: the treasurer records money and creates expenses; the
- * chairperson and secretary approve expenses (two approvers, for the default quorum of two);
- * the secretary handles membership; the auditor sees everything and changes nothing.
+ * chairperson and secretary approve expenses and investments (two approvers, for the default
+ * quorum of two); the secretary handles membership; the auditor sees everything and changes nothing.
  */
 public final class DefaultRolePermissions {
 
@@ -42,7 +42,7 @@ public final class DefaultRolePermissions {
                 REPORT_VIEW_ALL)));
 
         DEFAULTS.put(ChamaRole.SECRETARY, union(EVERY_MEMBER, EnumSet.of(
-                MEMBER_INVITE, CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, EXPENSE_APPROVE,
+                MEMBER_INVITE, CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, EXPENSE_APPROVE, INVESTMENT_APPROVE,
                 REPORT_VIEW_ALL, AUDIT_LOG_VIEW)));
 
         DEFAULTS.put(ChamaRole.CHAIRPERSON, EnumSet.allOf(ChamaPermission.class));

@@ -83,6 +83,6 @@ class ExpenseTest {
     }
 
     private static Expense request(long amount, String payee, String description, LocalDate incurredOn) {
-        return Expense.request(CHAMA, TREASURER, amount, "KES", payee, description, "5000", incurredOn, 2, TODAY, NOW);
+        return Expense.request(CHAMA, TREASURER, amount, "KES", payee, description, "5000", null, incurredOn, 2, TODAY, NOW);
     }
 }

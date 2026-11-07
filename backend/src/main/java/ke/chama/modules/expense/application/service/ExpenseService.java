@@ -4,6 +4,9 @@ import ke.chama.modules.audit.api.AuditEntry;
 import ke.chama.modules.audit.api.AuditTrail;
 import ke.chama.modules.chama.api.ChamaDirectory;
 import ke.chama.modules.chama.api.ChamaSummary;
+import ke.chama.modules.expense.api.ExpenseTotals;
+import ke.chama.modules.expense.api.InvestmentLookup;
+import ke.chama.modules.expense.api.InvestmentLookup.LinkedInvestment;
 import ke.chama.modules.expense.application.port.in.ExpenseUseCases;
 import ke.chama.modules.expense.application.port.out.ExpenseRepository;
 import ke.chama.modules.expense.domain.exception.ExpenseExceptions.DuplicateReferenceException;
@@ -11,6 +14,7 @@ import ke.chama.modules.expense.domain.exception.ExpenseExceptions.ExpenseNotFou
 import ke.chama.modules.expense.domain.exception.ExpenseExceptions.InsufficientFundsException;
 import ke.chama.modules.expense.domain.exception.ExpenseExceptions.InvalidExpenseAccountException;
 import ke.chama.modules.expense.domain.exception.ExpenseExceptions.InvalidExpenseException;
+import ke.chama.modules.expense.domain.exception.ExpenseExceptions.InvalidExpenseInvestmentException;
 import ke.chama.modules.expense.domain.model.Expense;
 import ke.chama.modules.member.api.MemberDirectory;
 import ke.chama.modules.member.api.MemberSummary;
@@ -49,7 +53,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
-public class ExpenseService implements ExpenseUseCases {
+public class ExpenseService implements ExpenseUseCases, ExpenseTotals {
 
     static final String DEFAULT_ACCOUNT = "5000";
     static final String SOURCE = "EXPENSE";
@@ -60,16 +64,19 @@ public class ExpenseService implements ExpenseUseCases {
     private final ChamaDirectory chamas;
     private final Ledger ledger;
     private final AuditTrail auditTrail;
+    private final InvestmentLookup investments;
     private final Clock clock;
     private final ZoneId zone;
 
     public ExpenseService(ExpenseRepository repository, MemberDirectory members, ChamaDirectory chamas, Ledger ledger,
-                          AuditTrail auditTrail, Clock clock, @Value("${chama.time-zone:Africa/Nairobi}") String timeZone) {
+                          AuditTrail auditTrail, InvestmentLookup investments, Clock clock,
+                          @Value("${chama.time-zone:Africa/Nairobi}") String timeZone) {
         this.repository = repository;
         this.members = members;
         this.chamas = chamas;
         this.ledger = ledger;
         this.auditTrail = auditTrail;
+        this.investments = investments;
         this.clock = clock;
         this.zone = ZoneId.of(timeZone);
     }
@@ -89,12 +96,27 @@ public class ExpenseService implements ExpenseUseCases {
         if (!account.active()) {
             throw new InvalidExpenseAccountException("Account " + account.code() + " (" + account.name() + ") is inactive");
         }
+        if (request.investmentId() != null) {
+            LinkedInvestment investment = investments.find(chamaId, request.investmentId())
+                    .orElseThrow(() -> new InvalidExpenseInvestmentException("There is no such investment in this chama"));
+            if (!investment.active()) {
+                throw new InvalidExpenseInvestmentException("Expenses can only be charged to an active investment; "
+                        + investment.name() + " is not active");
+            }
+        }
         Expense expense = Expense.request(chamaId, actorUserId, request.amountMinor(), currency(chamaId),
-                request.payee(), request.description(), account.code(), request.incurredOn(),
+                request.payee(), request.description(), account.code(), request.investmentId(), request.incurredOn(),
                 chamas.approvalQuorum(chamaId).orElseThrow(), today(), clock.instant());
         repository.insert(expense);
-        audit(expense, actorUserId, "EXPENSE_REQUESTED", Map.of("amountMinor", expense.amountMinor(),
-                "payee", expense.payee(), "description", expense.description(), "accountCode", expense.accountCode()));
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("amountMinor", expense.amountMinor());
+        details.put("payee", expense.payee());
+        details.put("description", expense.description());
+        details.put("accountCode", expense.accountCode());
+        if (expense.investmentId() != null) {
+            details.put("investmentId", expense.investmentId().toString());
+        }
+        audit(expense, actorUserId, "EXPENSE_REQUESTED", details);
         return view(expense);
     }
 
@@ -170,11 +192,18 @@ public class ExpenseService implements ExpenseUseCases {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ExpenseView> expenses(UUID chamaId, Expense.Status status, LocalDate from, LocalDate to, Pageable pageable) {
+    public Page<ExpenseView> expenses(UUID chamaId, Expense.Status status, UUID investmentId, LocalDate from,
+                                      LocalDate to, Pageable pageable) {
         requireRange(from, to);
         Map<UUID, MemberSummary> seated = seatedById(chamaId);
-        Map<String, String> accountNames = new HashMap<>();
-        return repository.expenses(chamaId, status, from, to, pageable).map(e -> view(e, seated, accountNames));
+        Map<String, String> names = new HashMap<>();
+        return repository.expenses(chamaId, status, investmentId, from, to, pageable).map(e -> view(e, seated, names));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> paidByInvestment(UUID chamaId) {
+        return repository.paidByInvestment(chamaId);
     }
 
     @Override
@@ -224,6 +253,15 @@ public class ExpenseService implements ExpenseUseCases {
         return cache.computeIfAbsent(code, c -> ledger.account(chamaId, c).map(LedgerAccountSummary::name).orElse(null));
     }
 
+    /** Cached alongside account names, keyed by the investment id. */
+    private String investmentName(UUID chamaId, UUID investmentId, Map<String, String> cache) {
+        if (investmentId == null) {
+            return null;
+        }
+        return cache.computeIfAbsent(investmentId.toString(),
+                k -> investments.find(chamaId, investmentId).map(LinkedInvestment::name).orElse(null));
+    }
+
     private static LedgerAccountKey accountFor(String method) {
         return switch (method) {
             case "BANK" -> LedgerAccountKey.BANK;
@@ -263,7 +301,8 @@ public class ExpenseService implements ExpenseUseCases {
                 .map(a -> new ApprovalView(a.approverUserId(), name(seated.get(a.approverUserId())), a.note(), a.approvedAt()))
                 .toList();
         return new ExpenseView(e.id(), e.amountMinor(), e.currency(), e.payee(), e.description(), e.accountCode(),
-                accountName(e.chamaId(), e.accountCode(), accountNames), e.incurredOn(), e.status(), e.requestedBy(),
+                accountName(e.chamaId(), e.accountCode(), accountNames), e.investmentId(),
+                investmentName(e.chamaId(), e.investmentId(), accountNames), e.incurredOn(), e.status(), e.requestedBy(),
                 name(seated.get(e.requestedBy())), e.requiredApprovals(), approvals, e.rejectedBy(), e.rejectedAt(),
                 e.rejectionReason(), e.cancelledAt(), e.paidOn(), e.paidBy(), e.paymentMethod(), e.paymentReference(),
                 e.paymentEntryId());

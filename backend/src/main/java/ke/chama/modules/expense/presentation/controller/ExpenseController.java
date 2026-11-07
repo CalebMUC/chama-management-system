@@ -37,8 +37,8 @@ import java.util.UUID;
 /**
  * Expenses of the caller's chama. Needs the EXPENSES licence feature. Every member can see them.
  * <pre>
- * POST /api/v1/expenses                 EXPENSE_CREATE   {amountMinor, payee, description, accountCode, incurredOn}
- * GET  /api/v1/expenses                 EXPENSE_VIEW     ?status=&from=&to=&page=&size=
+ * POST /api/v1/expenses                 EXPENSE_CREATE   {amountMinor, payee, description, accountCode, investmentId, incurredOn}
+ * GET  /api/v1/expenses                 EXPENSE_VIEW     ?status=&investmentId=&from=&to=&page=&size=
  * GET  /api/v1/expenses/summary         EXPENSE_VIEW     ?from=&to= (default: this month)
  * GET  /api/v1/expenses/{id}            EXPENSE_VIEW
  * POST /api/v1/expenses/{id}/approve    EXPENSE_APPROVE  {note}
@@ -63,7 +63,8 @@ class ExpenseController {
 
     @Operation(summary = "Record an expense",
             description = "Awaits approval by the chama's quorum of officials other than you. Charged to an expense "
-                    + "account (default 5000 Operating expenses).")
+                    + "account (default 5000 Operating expenses), and optionally to an active investment, so an "
+                    + "investment's running costs count against its income.")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @RequiresChamaPermission(ChamaPermission.EXPENSE_CREATE)
@@ -75,11 +76,12 @@ class ExpenseController {
     @GetMapping
     @RequiresChamaPermission(ChamaPermission.EXPENSE_VIEW)
     ApiResponse<List<ExpenseView>> list(@RequestParam(required = false) Expense.Status status,
+                                        @RequestParam(required = false) UUID investmentId,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                                         @RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "50") int size) {
-        return ApiResponse.page(expenses.expenses(chama(), status, from, to,
+        return ApiResponse.page(expenses.expenses(chama(), status, investmentId, from, to,
                 PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE))));
     }
 

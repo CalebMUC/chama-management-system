@@ -242,6 +242,31 @@ class JdbcLedgerRepository implements LedgerRepository {
     }
 
     @Override
+    public Map<UUID, Totals> totalsBetween(UUID chamaId, LocalDate from, LocalDate to) {
+        MapSqlParameterSource params = new MapSqlParameterSource("tenant", chamaId);
+        StringBuilder dates = new StringBuilder();
+        if (from != null) {
+            dates.append(" and e.entry_date >= :from");
+            params.addValue("from", Date.valueOf(from));
+        }
+        if (to != null) {
+            dates.append(" and e.entry_date <= :to");
+            params.addValue("to", Date.valueOf(to));
+        }
+        Map<UUID, Totals> result = new HashMap<>();
+        jdbc.query("""
+                        select l.account_id, sum(l.debit_minor) as debits, sum(l.credit_minor) as credits
+                          from ledger.journal_lines l
+                          join ledger.journal_entries e on e.tenant_id = l.tenant_id and e.id = l.entry_id
+                         where l.tenant_id = :tenant""" + dates + " group by l.account_id",
+                params,
+                rs -> {
+                    result.put(rs.getObject("account_id", UUID.class), new Totals(rs.getLong("debits"), rs.getLong("credits")));
+                });
+        return result;
+    }
+
+    @Override
     public Totals accountTotals(UUID chamaId, UUID accountId, UUID memberUserId, LocalDate before) {
         StringBuilder sql = new StringBuilder("""
                 select coalesce(sum(l.debit_minor), 0) as debits, coalesce(sum(l.credit_minor), 0) as credits

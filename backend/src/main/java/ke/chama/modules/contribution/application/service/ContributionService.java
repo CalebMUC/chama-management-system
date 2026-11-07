@@ -12,6 +12,7 @@ import ke.chama.modules.chama.api.ChamaDirectory;
 import ke.chama.modules.chama.api.ChamaSummary;
 import ke.chama.modules.chama.api.ContributionRules;
 import ke.chama.modules.contribution.api.ContributionCalendar;
+import ke.chama.modules.contribution.api.ContributionReports;
 import ke.chama.modules.contribution.api.LateContributions;
 import ke.chama.modules.contribution.application.port.in.ContributionUseCases;
 import ke.chama.modules.contribution.application.port.in.ContributionViews.AllocationView;
@@ -88,7 +89,8 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
-public class ContributionService implements ContributionUseCases, LateContributions, ContributionCalendar {
+public class ContributionService implements ContributionUseCases, LateContributions, ContributionCalendar,
+        ContributionReports {
 
     static final String SOURCE_TYPE = "CONTRIBUTION";
     static final String AUDIT_TARGET = "CONTRIBUTION";
@@ -342,6 +344,45 @@ public class ContributionService implements ContributionUseCases, LateContributi
         });
         late.sort(Comparator.comparing(LateContribution::dueDate).thenComparing(LateContribution::memberUserId));
         return late;
+    }
+
+    // ---- ContributionReports (for the report module) -------------------------------------------
+
+    @Override
+    public ContributionMatrix matrix(UUID chamaId) {
+        periods.bringUpToDate(chamaId, zone);
+        Book book = book(chamaId);
+        String currency = rules(chamaId).currency();
+        List<PeriodColumn> columns = book.periods.stream().map(p -> {
+            PeriodSummaryView s = summary(p, book);
+            return new PeriodColumn(p.id(), p.key(), p.dueDate(), s.due(), s.expectedMinor(), s.collectedMinor(),
+                    s.members(), s.membersPaid(), s.membersLate());
+        }).toList();
+        List<MemberRow> rows = members.seatedMembers(chamaId).stream().map(m -> {
+            MemberStanding standing = book.standings.getOrDefault(m.userId(), MemberStanding.combine(List.of()));
+            Map<UUID, PeriodStanding> byPeriod = standing.periods().stream()
+                    .collect(Collectors.toMap(ps -> ps.period().id(), Function.identity()));
+            List<Cell> cells = book.periods.stream().map(p -> {
+                PeriodStanding ps = byPeriod.get(p.id());
+                return ps == null ? null
+                        : new Cell(ps.amountDueMinor(), ps.paidMinor(), ps.status().name(), ps.late());
+            }).toList();
+            return new MemberRow(m.userId(), snapshot(standing), cells);
+        }).toList();
+        return new ContributionMatrix(currency, columns, rows);
+    }
+
+    @Override
+    public StandingSnapshot standing(UUID chamaId, UUID memberUserId) {
+        periods.bringUpToDate(chamaId, zone);
+        return snapshot(MemberStanding.combine(List.copyOf(standingsOf(chamaId, memberUserId, rules(chamaId)).values())));
+    }
+
+    private static StandingSnapshot snapshot(MemberStanding s) {
+        PeriodStanding latest = s.periods().isEmpty() ? null : s.periods().getLast();
+        return new StandingSnapshot(s.totalPaidMinor(), s.dueToDateMinor(), s.arrearsMinor(), s.advanceMinor(),
+                s.latePeriods(), latest == null ? null : latest.period().key(),
+                latest == null ? null : latest.status().name());
     }
 
     // ---- standings ----------------------------------------------------------------------------

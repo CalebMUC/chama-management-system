@@ -164,6 +164,13 @@ class JdbcLoanRepository implements LoanRepository {
     }
 
     @Override
+    public List<Loan> allLoans(UUID chamaId) {
+        return hydrate(chamaId, jdbc.query("select " + COLUMNS + " from loan.loans"
+                        + " where tenant_id = :tenant order by applied_on desc, created_at desc",
+                Map.of("tenant", chamaId), (rs, i) -> row(rs)));
+    }
+
+    @Override
     public List<Loan> loansOf(UUID chamaId, UUID borrowerUserId) {
         return hydrate(chamaId, jdbc.query("select " + COLUMNS + " from loan.loans"
                         + " where tenant_id = :tenant and borrower_user_id = :borrower order by applied_on desc, created_at desc",

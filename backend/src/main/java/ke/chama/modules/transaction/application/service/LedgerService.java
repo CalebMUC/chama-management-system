@@ -40,6 +40,7 @@ import ke.chama.shared.domain.Money;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -154,16 +155,48 @@ public class LedgerService implements Ledger, LedgerUseCases {
 
     @Override
     @Transactional(readOnly = true)
-    public MemberStatement memberStatement(UUID chamaId, String accountCode, UUID memberUserId, LocalDate from,
-                                           LocalDate to) {
-        LedgerAccount account = memberLedgerAccount(chamaId, accountCode);
+    public Statement memberStatement(UUID chamaId, String accountCode, UUID memberUserId, LocalDate from,
+                                     LocalDate to) {
+        return statementOf(chamaId, memberLedgerAccount(chamaId, accountCode), memberUserId, from, to);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Statement accountStatement(UUID chamaId, String accountCode, LocalDate from, LocalDate to) {
+        String code = accountCode == null ? "" : accountCode.trim().toUpperCase(Locale.ROOT);
+        LedgerAccount account = repository.accountByCode(chamaId, code).orElseThrow(() -> new AccountNotFoundException(code));
+        return statementOf(chamaId, account, null, from, to);
+    }
+
+    private Statement statementOf(UUID chamaId, LedgerAccount account, UUID memberUserId, LocalDate from, LocalDate to) {
         StatementView view = statement(chamaId, account.id(), memberUserId, from, to);
-        List<MemberStatement.Line> lines = view.lines().stream()
-                .map(l -> new MemberStatement.Line(l.entryId(), l.entryNumber(), l.entryDate(), l.description(),
-                        l.reference(), l.sourceType(), l.debitMinor(), l.creditMinor(), l.balanceMinor(), l.memo()))
+        List<Statement.Line> lines = view.lines().stream()
+                .map(l -> new Statement.Line(l.entryId(), l.entryNumber(), l.entryDate(), l.description(),
+                        l.reference(), l.sourceType(), l.debitMinor(), l.creditMinor(), l.balanceMinor(),
+                        l.memberUserId(), l.memo()))
                 .toList();
-        return new MemberStatement(account.code(), account.name(), account.currency().getCurrencyCode(), memberUserId,
+        return new Statement(account.code(), account.name(), account.currency().getCurrencyCode(), memberUserId,
                 from, to, view.openingBalanceMinor(), view.closingBalanceMinor(), lines);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AccountTotal> accountTotals(UUID chamaId, LocalDate from, LocalDate to) {
+        Map<UUID, Totals> totals = repository.totalsBetween(chamaId, from, to);
+        return repository.accounts(chamaId).stream().map(a -> {
+            Totals t = totals.getOrDefault(a.id(), Totals.ZERO);
+            return new AccountTotal(a.code(), a.name(), a.type().name(), a.systemKey(), a.memberLedger(), t.debits(),
+                    t.credits(), a.balance(t.debits(), t.credits()));
+        }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EntrySummary> recentEntries(UUID chamaId, int limit) {
+        return repository.entries(chamaId, null, null, null, PageRequest.of(0, Math.clamp(limit, 1, 100))).stream()
+                .map(e -> new EntrySummary(e.id(), e.number(), e.entryDate(), e.description(), e.reference(),
+                        e.sourceType(), e.totalMinor(), e.isReversal()))
+                .toList();
     }
 
     @Override

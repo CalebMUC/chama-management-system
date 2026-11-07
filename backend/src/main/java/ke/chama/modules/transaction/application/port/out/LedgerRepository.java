@@ -63,6 +63,9 @@ public interface LedgerRepository {
     /** Debit and credit totals per account for entries dated on or before {@code asOf}. */
     Map<UUID, Totals> totalsByAccount(UUID chamaId, LocalDate asOf);
 
+    /** Debit and credit totals per account for entries dated {@code from}..{@code to}, inclusive; null = open. */
+    Map<UUID, Totals> totalsBetween(UUID chamaId, LocalDate from, LocalDate to);
+
     /** Totals of one account, optionally for one member, dated before {@code before} (exclusive); null = all. */
     Totals accountTotals(UUID chamaId, UUID accountId, UUID memberUserId, LocalDate before);
 

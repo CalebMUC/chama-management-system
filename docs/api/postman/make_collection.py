@@ -407,6 +407,35 @@ items = [
         req("My balances", "GET", "/api/v1/ledger/me", auth="member"),
     ]),
 
+    folder("Dashboard", [
+        req("Chama dashboard", "GET", "/api/v1/dashboard",
+            desc="Members, cash, savings per product, the current contribution period, the loan book (PAR30), "
+                 "penalties, investments, this month and the year to date, what is waiting for officials and "
+                 "the latest ledger entries. Sections the licence does not include are null. REPORT_VIEW_ALL."),
+        req("My dashboard", "GET", "/api/v1/dashboard/me", auth="member"),
+    ], desc="Available to every chama, whatever its licence."),
+
+    folder("Reports", [
+        req("Statement of financial position", "GET", "/api/v1/reports/financial-position",
+            query=[q("asOf", "2026-12-31")], desc="Today by default."),
+        req("Income statement", "GET", "/api/v1/reports/income-statement",
+            query=[q("from", "2026-01-01"), q("to", "2026-12-31")], desc="The year to date by default."),
+        req("Cash book", "GET", "/api/v1/reports/cash-book",
+            query=[q("account", "1020", desc="One cash account's code; cash, bank and M-Pesa together without it"),
+                   q("from", "2026-11-01"), q("to", "2026-11-30")],
+            desc="This month by default."),
+        req("Contribution report", "GET", "/api/v1/reports/contributions",
+            query=[q("from", "2026-01-01"), q("to", "2026-12-31")],
+            desc="Every member against every period (optionally only periods due between from and to)."),
+        req("Loan portfolio", "GET", "/api/v1/reports/loan-portfolio",
+            desc="Active loans aged by days overdue, PAR30, and loans awaiting approval or disbursement."),
+        req("Savings register", "GET", "/api/v1/reports/savings"),
+        req("A member's statement", "GET", "/api/v1/reports/members/{{memberUserId}}/statement",
+            query=[q("from", "2026-01-01"), q("to", "2026-12-31")]),
+        req("My statement", "GET", "/api/v1/reports/members/me/statement", auth="member",
+            query=[q("from", "2026-01-01"), q("to", "2026-12-31")]),
+    ], desc="REPORT_VIEW_ALL, except My statement. Needs the REPORTS licence feature (every plan has it)."),
+
     folder("Audit log", [
         req("Audit log", "GET", "/api/v1/audit-log", query=[q("action", "LOAN_APPROVED")] + PAGE),
     ]),

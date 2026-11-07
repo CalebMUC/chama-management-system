@@ -51,6 +51,13 @@ class MemberDirectoryService implements MemberDirectory {
                 .map(m -> summary(m, users.findById(userId).orElse(null)));
     }
 
+    @Override
+    public MembershipCounts counts(UUID chamaId) {
+        return new MembershipCounts(memberships.countByChamaIdAndStatus(chamaId, MembershipStatus.ACTIVE),
+                memberships.countByChamaIdAndStatus(chamaId, MembershipStatus.SUSPENDED),
+                memberships.countByChamaIdAndStatus(chamaId, MembershipStatus.PENDING_APPROVAL));
+    }
+
     private static MemberSummary summary(Membership m, UserSummary user) {
         return new MemberSummary(m.getId(), m.getUserId(), m.getMemberNumber(),
                 user == null ? null : user.firstName(), user == null ? null : user.lastName(),

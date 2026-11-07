@@ -40,7 +40,23 @@ public interface Ledger {
      * One member's lines on a member-ledger account, oldest first, with a running balance.
      * {@code from} and {@code to} are optional and inclusive.
      */
-    MemberStatement memberStatement(UUID chamaId, String accountCode, UUID memberUserId, LocalDate from, LocalDate to);
+    Statement memberStatement(UUID chamaId, String accountCode, UUID memberUserId, LocalDate from, LocalDate to);
+
+    /**
+     * Every line on an account (for every member, on a member-ledger account), oldest first, with a
+     * running balance, e.g. the cash book. {@code from} and {@code to} are optional and inclusive.
+     */
+    Statement accountStatement(UUID chamaId, String accountCode, LocalDate from, LocalDate to);
+
+    /**
+     * Every account in the chart with its movements for entries dated {@code from}..{@code to}
+     * (inclusive; either may be null for an open end), by code. Accounts without movements are
+     * included with zeros.
+     */
+    List<AccountTotal> accountTotals(UUID chamaId, LocalDate from, LocalDate to);
+
+    /** The latest entries, newest first. */
+    List<EntrySummary> recentEntries(UUID chamaId, int limit);
 
     /** The account with this code in the chama's chart, if any. */
     Optional<LedgerAccountSummary> account(UUID chamaId, String code);
@@ -56,13 +72,33 @@ public interface Ledger {
      */
     LedgerAccountSummary openMemberLedgerAccount(UUID chamaId, String code, String name, String type, UUID actorUserId);
 
-    /** @param openingBalanceMinor the balance before {@code from} (zero without {@code from}) */
-    record MemberStatement(String accountCode, String accountName, String currency, UUID memberUserId,
-                           LocalDate from, LocalDate to, long openingBalanceMinor, long closingBalanceMinor,
-                           List<Line> lines) {
+    /**
+     * @param memberUserId        the member, for one member's statement; null for the whole account
+     * @param openingBalanceMinor the balance before {@code from} (zero without {@code from})
+     */
+    record Statement(String accountCode, String accountName, String currency, UUID memberUserId,
+                     LocalDate from, LocalDate to, long openingBalanceMinor, long closingBalanceMinor,
+                     List<Line> lines) {
 
+        /** @param memberUserId the member a line of a member-ledger account belongs to */
         public record Line(UUID entryId, long entryNumber, LocalDate entryDate, String description, String reference,
-                           String sourceType, long debitMinor, long creditMinor, long balanceMinor, String memo) {
+                           String sourceType, long debitMinor, long creditMinor, long balanceMinor, UUID memberUserId,
+                           String memo) {
         }
+    }
+
+    /**
+     * One account's movements over a date range.
+     *
+     * @param type         ASSET, LIABILITY, EQUITY, INCOME or EXPENSE
+     * @param balanceMinor debits less credits for assets and expenses, credits less debits otherwise
+     */
+    record AccountTotal(String code, String name, String type, LedgerAccountKey systemKey, boolean memberLedger,
+                        long debitMinor, long creditMinor, long balanceMinor) {
+    }
+
+    /** @param totalMinor the entry's debits (which equal its credits) */
+    record EntrySummary(UUID id, long number, LocalDate entryDate, String description, String reference,
+                        String sourceType, long totalMinor, boolean reversal) {
     }
 }

@@ -28,6 +28,7 @@ import ke.chama.shared.domain.Money;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -204,6 +205,16 @@ public class ExpenseService implements ExpenseUseCases, ExpenseTotals {
     @Transactional(readOnly = true)
     public Map<UUID, Long> paidByInvestment(UUID chamaId) {
         return repository.paidByInvestment(chamaId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExpenseQueue queue(UUID chamaId) {
+        PageRequest one = PageRequest.of(0, 1);
+        return new ExpenseQueue(
+                repository.expenses(chamaId, Expense.Status.PENDING_APPROVAL, null, null, null, one).getTotalElements(),
+                repository.expenses(chamaId, Expense.Status.APPROVED, null, null, null, one).getTotalElements(),
+                repository.awaitingPaymentMinor(chamaId));
     }
 
     @Override

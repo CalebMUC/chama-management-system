@@ -25,6 +25,9 @@ public interface LoanRepository {
 
     List<Loan> loansOf(UUID chamaId, UUID borrowerUserId);
 
+    /** Every loan of the chama, newest first. */
+    List<Loan> allLoans(UUID chamaId);
+
     /** Loans the member was asked to guarantee, newest first. */
     List<Loan> guaranteedBy(UUID chamaId, UUID guarantorUserId);
 

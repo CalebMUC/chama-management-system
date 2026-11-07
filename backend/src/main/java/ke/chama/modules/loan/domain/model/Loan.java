@@ -363,6 +363,13 @@ public final class Loan {
         return schedule(today).stream().filter(Instalment::overdue).mapToLong(Instalment::unpaidMinor).sum();
     }
 
+    /** Days since the oldest instalment still unpaid fell due; 0 when nothing is overdue. */
+    public int daysInArrears(LocalDate today) {
+        return schedule(today).stream().filter(Instalment::overdue).findFirst()
+                .map(i -> (int) java.time.temporal.ChronoUnit.DAYS.between(i.dueDate(), today))
+                .orElse(0);
+    }
+
     /** The first instalment not fully paid. */
     public Optional<Instalment> nextInstalment(LocalDate today) {
         return schedule(today).stream().filter(i -> i.unpaidMinor() > 0).findFirst();

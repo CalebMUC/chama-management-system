@@ -15,4 +15,11 @@ public interface MemberDirectory {
 
     /** The member, if seated. */
     Optional<MemberSummary> seatedMember(UUID chamaId, UUID userId);
+
+    /** How many memberships are in each state that matters day to day. */
+    MembershipCounts counts(UUID chamaId);
+
+    /** @param pendingApproval applications waiting for an official to approve or reject them */
+    record MembershipCounts(long active, long suspended, long pendingApproval) {
+    }
 }

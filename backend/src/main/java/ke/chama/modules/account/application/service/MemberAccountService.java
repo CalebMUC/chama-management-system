@@ -25,7 +25,7 @@ import ke.chama.modules.chama.api.ChamaSummary;
 import ke.chama.modules.member.api.MemberDirectory;
 import ke.chama.modules.member.api.MemberSummary;
 import ke.chama.modules.transaction.api.Ledger;
-import ke.chama.modules.transaction.api.Ledger.MemberStatement;
+import ke.chama.modules.transaction.api.Ledger.Statement;
 import ke.chama.shared.domain.Money;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -258,7 +258,7 @@ public class MemberAccountService implements MemberAccounts, MemberAccountUseCas
             throw new AccountStateException("'to' must not be before 'from'");
         }
         SavingsProduct product = product(chamaId, account.productId());
-        MemberStatement s = ledger.memberStatement(chamaId, product.ledgerAccountCode(), account.memberUserId(), from, to);
+        Statement s = ledger.memberStatement(chamaId, product.ledgerAccountCode(), account.memberUserId(), from, to);
         List<StatementLineView> lines = s.lines().stream()
                 .map(l -> new StatementLineView(l.entryId(), l.entryNumber(), l.entryDate(), l.description(),
                         l.reference(), l.sourceType(), l.debitMinor(), l.creditMinor(), l.balanceMinor(), l.memo()))

@@ -16,7 +16,7 @@ class MembershipTest {
     private static final UUID CHAMA = UUID.randomUUID();
     private static final UUID SECRETARY = UUID.randomUUID();
     private static final UUID CHAIR = UUID.randomUUID();
-    private static final UUID INVITEE = UUID.randomUUID();
+    private static final UUID APPLICANT = UUID.randomUUID();
 
     @Test
     void founderIsActiveChairpersonNumberOne() {
@@ -25,18 +25,15 @@ class MembershipTest {
         assertThat(founder.isActive()).isTrue();
         assertThat(founder.getMemberNumber()).isEqualTo(1);
         assertThat(founder.getRoles()).containsExactlyInAnyOrder(ChamaRole.MEMBER, ChamaRole.CHAIRPERSON);
-        assertThat(founder.getInvitedEmail()).isEqualTo("chair@example.com");
+        assertThat(founder.getEmail()).isEqualTo("chair@example.com");
     }
 
     @Test
-    void inviteAcceptApproveRecordsWhoDidWhat() {
-        Membership membership = Membership.invite(CHAMA, "jane@example.com", SECRETARY, NOW);
-        assertThat(membership.getStatus()).isEqualTo(MembershipStatus.INVITED);
-        assertThat(membership.getUserId()).isNull();
-
-        membership.accept(INVITEE, NOW.plusSeconds(60));
+    void applicationThenApprovalRecordsWhoDidWhat() {
+        Membership membership = Membership.application(CHAMA, APPLICANT, "jane@example.com", NOW);
         assertThat(membership.getStatus()).isEqualTo(MembershipStatus.PENDING_APPROVAL);
-        assertThat(membership.belongsTo(INVITEE)).isTrue();
+        assertThat(membership.belongsTo(APPLICANT)).isTrue();
+        assertThat(membership.getMemberNumber()).isNull();
 
         membership.approve(CHAIR, 7, NOW.plusSeconds(120));
         assertThat(membership.isActive()).isTrue();
@@ -46,12 +43,23 @@ class MembershipTest {
     }
 
     @Test
-    void cannotApproveBeforeTheInviteeAccepts() {
-        Membership membership = Membership.invite(CHAMA, "jane@example.com", SECRETARY, NOW);
+    void anApprovedMembershipCannotBeApprovedAgain() {
+        Membership membership = Membership.application(CHAMA, APPLICANT, "jane@example.com", NOW);
+        membership.approve(CHAIR, 2, NOW);
 
-        assertThatThrownBy(() -> membership.approve(CHAIR, 2, NOW))
+        assertThatThrownBy(() -> membership.approve(CHAIR, 3, NOW))
                 .isInstanceOf(InvalidMembershipStateException.class)
-                .hasMessageContaining("INVITED");
+                .hasMessageContaining("ACTIVE");
+    }
+
+    @Test
+    void rejectedApplicantsGetNoMemberNumber() {
+        Membership membership = Membership.application(CHAMA, APPLICANT, "jane@example.com", NOW);
+
+        membership.reject(SECRETARY, NOW);
+
+        assertThat(membership.getStatus()).isEqualTo(MembershipStatus.REJECTED);
+        assertThat(membership.getMemberNumber()).isNull();
     }
 
     @Test
@@ -77,18 +85,10 @@ class MembershipTest {
     }
 
     @Test
-    void rolesOfAnInactiveMembershipCannotChange() {
-        Membership membership = Membership.invite(CHAMA, "jane@example.com", SECRETARY, NOW);
+    void rolesOfAPendingMembershipCannotChange() {
+        Membership membership = Membership.application(CHAMA, APPLICANT, "jane@example.com", NOW);
 
         assertThatThrownBy(() -> membership.changeRoles(Set.of(ChamaRole.TREASURER)))
                 .isInstanceOf(InvalidMembershipStateException.class);
-    }
-
-    @Test
-    void matchesInvitationEmailIgnoringCase() {
-        Membership membership = Membership.invite(CHAMA, "jane@example.com", SECRETARY, NOW);
-
-        assertThat(membership.isAddressedTo(" JANE@example.com")).isTrue();
-        assertThat(membership.isAddressedTo("john@example.com")).isFalse();
     }
 }

@@ -1,0 +1,3421 @@
+{
+  "info": {
+    "_postman_id": "13473029-f6ea-5ac3-baac-a76c5a1c8806",
+    "name": "Chama Management API",
+    "description": "Every endpoint of the Chama Management API (local dev: {{baseUrl}}).\n\n1. Run the requests in **0. Log in**: they save the platform, official and member tokens.\n2. Most requests use the official's token; 'my ...' requests use the member's; Platform uses the admin's.\n3. List and create requests save the ids that later requests use ({{loanId}}, {{penaltyId}}, ...).\n\nEvery response has the same envelope: { success, message, data, meta?, error?, timestamp }. Amounts are minor units (500000 = KES 5,000); rates are basis points (200 = 2%). Public auth requests name the chama with the X-Chama-Code header. See docs/api/response-format.md for error codes, and /swagger-ui.html for the live schema.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{officialToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Response uses the API envelope', () => {",
+          "  const j = pm.response.json();",
+          "  pm.expect(j).to.have.property('success');",
+          "  pm.expect(j).to.have.property('message');",
+          "});",
+          "pm.test(`success matches the HTTP status (${pm.response.code})`, () => {",
+          "  pm.expect(pm.response.json().success).to.eql(pm.response.code < 400);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "chamaCode",
+      "value": "mokica",
+      "type": "string"
+    },
+    {
+      "key": "platformEmail",
+      "value": "admin@chama.local",
+      "type": "string"
+    },
+    {
+      "key": "platformPassword",
+      "value": "Admin2026pass",
+      "type": "string"
+    },
+    {
+      "key": "officialEmail",
+      "value": "chair@mokica.test",
+      "type": "string"
+    },
+    {
+      "key": "officialPassword",
+      "value": "Mokica2026pass",
+      "type": "string"
+    },
+    {
+      "key": "memberEmail",
+      "value": "wanjiru@example.com",
+      "type": "string"
+    },
+    {
+      "key": "memberPassword",
+      "value": "Wanjiru2026x",
+      "type": "string"
+    },
+    {
+      "key": "platformToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "platformRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "officialToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "officialRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "memberToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "memberRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "chamaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "membershipId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "memberUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "guarantorUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "periodId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "penaltyId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "loanId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "expenseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "investmentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accountId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "entryId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Log in",
+      "item": [
+        {
+          "name": "Log in as platform admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{platformEmail}}\",\n  \"password\": \"{{platformPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "No X-Chama-Code header: platform accounts log in to the platform. Saves {{platformToken}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  pm.collectionVariables.set('platformToken', j.data.accessToken);",
+                  "  pm.collectionVariables.set('platformRefreshToken', j.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as chama official",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Chama-Code",
+                "value": "{{chamaCode}}",
+                "description": "Which chama this public request is for"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{officialEmail}}\",\n  \"password\": \"{{officialPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "An official of {{chamaCode}} (e.g. the chairperson). Saves {{officialToken}}, used by most requests."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  pm.collectionVariables.set('officialToken', j.data.accessToken);",
+                  "  pm.collectionVariables.set('officialRefreshToken', j.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Chama-Code",
+                "value": "{{chamaCode}}",
+                "description": "Which chama this public request is for"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{memberEmail}}\",\n  \"password\": \"{{memberPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "An ordinary member of {{chamaCode}}. Saves {{memberToken}}, used by the 'my ...' requests."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  pm.collectionVariables.set('memberToken', j.data.accessToken);",
+                  "  pm.collectionVariables.set('memberRefreshToken', j.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Run these first. Each saves its token in a collection variable."
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (self-signup into a chama)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Chama-Code",
+                "value": "{{chamaCode}}",
+                "description": "Which chama this public request is for"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new.member@example.com\",\n  \"phoneNumber\": \"0712345678\",\n  \"password\": \"Member2026pass\",\n  \"firstName\": \"New\",\n  \"lastName\": \"Member\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Creates the account and a membership application (PENDING_APPROVAL). A verification email is sent."
+          }
+        },
+        {
+          "name": "Verify email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Chama-Code",
+                "value": "{{chamaCode}}",
+                "description": "Which chama this public request is for"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/email/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "email",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<token from the email>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Resend verification email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Chama-Code",
+                "value": "{{chamaCode}}",
+                "description": "Which chama this public request is for"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/email/verify/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "email",
+                "verify",
+                "resend"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new.member@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Chama-Code",
+                "value": "{{chamaCode}}",
+                "description": "Which chama this public request is for"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/password/forgot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "password",
+                "forgot"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{memberEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Chama-Code",
+                "value": "{{chamaCode}}",
+                "description": "Which chama this public request is for"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/password/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "password",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<token from the email>\",\n  \"newPassword\": \"NewPass2026x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Refresh tokens (official)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{officialRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  pm.collectionVariables.set('officialToken', j.data.accessToken);",
+                  "  pm.collectionVariables.set('officialRefreshToken', j.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/password/change",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "password",
+                "change"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{officialPassword}}\",\n  \"newPassword\": \"NewPass2026x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Log out (this session)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{officialRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Log out everywhere",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Platform (admin only)",
+      "item": [
+        {
+          "name": "Onboard a chama",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform/chamas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform",
+                "chamas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chama\": {\n    \"name\": \"Baraka Chama\",\n    \"code\": \"baraka\",\n    \"description\": \"Savings group\",\n    \"currency\": \"KES\",\n    \"settings\": {\n      \"contributionAmountMinor\": 500000,\n      \"contributionFrequency\": \"MONTHLY\",\n      \"contributionDueDay\": 5,\n      \"lateGraceDays\": 5,\n      \"latePenaltyBasisPoints\": 200,\n      \"loanMaxMultiplier\": 3,\n      \"loanInterestBasisPoints\": 1000,\n      \"loanMinMembershipMonths\": 3,\n      \"loanGuarantorThresholdMinor\": 5000000,\n      \"loanGuarantorsRequired\": 2,\n      \"approvalQuorum\": 2\n    },\n    \"admin\": {\n      \"email\": \"chair@baraka.example\",\n      \"phoneNumber\": \"0722000111\",\n      \"password\": \"Baraka2026pass\",\n      \"firstName\": \"Amina\",\n      \"lastName\": \"Otieno\"\n    }\n  },\n  \"license\": {\n    \"plan\": \"STANDARD\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{platformToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The only way to create a chama. The admin becomes its chairperson. Licence defaults to TRIAL."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.chama.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('chamaId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List chamas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform/chamas?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform",
+                "chamas"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{platformToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.find(c => c.chama.code === pm.collectionVariables.get('chamaCode')).chama.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('chamaId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a chama",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform/chamas/{{chamaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform",
+                "chamas",
+                "{{chamaId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{platformToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update licence",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/platform/chamas/{{chamaId}}/license",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "platform",
+                "chamas",
+                "{{chamaId}}",
+                "license"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"STANDARD\",\n  \"validUntil\": \"2027-12-31T23:59:59Z\",\n  \"maxMembers\": 100,\n  \"features\": [\n    \"CONTRIBUTIONS\",\n    \"PENALTIES\",\n    \"LOANS\",\n    \"EXPENSES\",\n    \"REPORTS\"\n  ],\n  \"status\": \"ACTIVE\",\n  \"notes\": \"Annual renewal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{platformToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Every field is optional; null fields are left unchanged."
+          }
+        }
+      ],
+      "description": "Uses {{platformToken}}."
+    },
+    {
+      "name": "My chama",
+      "item": [
+        {
+          "name": "Get my chama",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chama",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chama"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get licence",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chama/license",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chama",
+                "license"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chama/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chama",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contributionAmountMinor\": 500000,\n  \"contributionFrequency\": \"MONTHLY\",\n  \"contributionDueDay\": 5,\n  \"lateGraceDays\": 5,\n  \"latePenaltyBasisPoints\": 200,\n  \"loanMaxMultiplier\": 3,\n  \"loanInterestBasisPoints\": 1000,\n  \"loanMinMembershipMonths\": 3,\n  \"loanGuarantorThresholdMinor\": 5000000,\n  \"loanGuarantorsRequired\": 2,\n  \"approvalQuorum\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Amounts are minor units (500000 = KES 5,000). Rates are basis points (200 = 2%)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Members & roles",
+      "item": [
+        {
+          "name": "List members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/members?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "members"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "disabled": true,
+                  "description": "PENDING_APPROVAL, ACTIVE, SUSPENDED, ..."
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Saves {{membershipId}} and {{memberUserId}} of {{memberEmail}}, and a {{guarantorUserId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const m = (j.data || []).find(x => x.email === pm.collectionVariables.get('memberEmail'));",
+                  "if (m) { pm.collectionVariables.set('membershipId', m.membershipId); pm.collectionVariables.set('memberUserId', m.userId); }",
+                  "const g = (j.data || []).find(x => x.email !== pm.collectionVariables.get('memberEmail') && x.email !== pm.collectionVariables.get('officialEmail'));",
+                  "if (g) pm.collectionVariables.set('guarantorUserId', g.userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My membership",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/members/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "members",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Invite by email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/members/invitations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "members",
+                "invitations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"friend@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Approve application",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/members/{{membershipId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "members",
+                "{{membershipId}}",
+                "approve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reject application",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/members/{{membershipId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "members",
+                "{{membershipId}}",
+                "reject"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Suspend member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/members/{{membershipId}}/suspend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "members",
+                "{{membershipId}}",
+                "suspend"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Three months in arrears\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Reactivate member",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/members/{{membershipId}}/reactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "members",
+                "{{membershipId}}",
+                "reactivate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change roles",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/members/{{membershipId}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "members",
+                "{{membershipId}}",
+                "roles"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    \"MEMBER\",\n    \"TREASURER\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Roles: MEMBER, CHAIRPERSON, TREASURER, SECRETARY, AUDITOR."
+          }
+        },
+        {
+          "name": "Roles and their permissions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "roles"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change a role's permissions",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/roles/AUDITOR/permissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "roles",
+                "AUDITOR",
+                "permissions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    \"CHAMA_VIEW\",\n    \"MEMBER_VIEW\",\n    \"CONTRIBUTION_VIEW_ALL\",\n    \"LOAN_VIEW_ALL\",\n    \"PENALTY_VIEW_ALL\",\n    \"LEDGER_VIEW\",\n    \"REPORT_VIEW_ALL\",\n    \"AUDIT_LOG_VIEW\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contributions",
+      "item": [
+        {
+          "name": "Record a contribution",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contributions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contributions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberUserId\": \"{{memberUserId}}\",\n  \"amountMinor\": 500000,\n  \"method\": \"MPESA\",\n  \"reference\": \"QK{{$timestamp}}\",\n  \"paidOn\": null,\n  \"notes\": \"November contribution\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Methods CASH, BANK, MPESA; MPESA and BANK need a reference. paidOn defaults to today."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('paymentId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contributions?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contributions"
+              ],
+              "query": [
+                {
+                  "key": "memberUserId",
+                  "value": "{{memberUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "RECORDED",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "One payment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contributions/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contributions",
+                "{{paymentId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reverse a payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contributions/{{paymentId}}/reverse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contributions",
+                "{{paymentId}}",
+                "reverse"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Recorded against the wrong member\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Periods",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contributions/periods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contributions",
+                "periods"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].period.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('periodId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who paid for a period",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contributions/periods/{{periodId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contributions",
+                "periods",
+                "{{periodId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Standings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contributions/standings?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contributions",
+                "standings"
+              ],
+              "query": [
+                {
+                  "key": "inArrears",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "My contributions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contributions/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contributions",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Needs the CONTRIBUTIONS licence feature."
+    },
+    {
+      "name": "Penalties",
+      "item": [
+        {
+          "name": "List penalties",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/penalties?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "penalties"
+              ],
+              "query": [
+                {
+                  "key": "memberUserId",
+                  "value": "{{memberUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "OUTSTANDING",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('penaltyId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fine a member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/penalties/fines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "penalties",
+                "fines"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberUserId\": \"{{memberUserId}}\",\n  \"amountMinor\": 20000,\n  \"reason\": \"Missed the monthly meeting\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('penaltyId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "One penalty",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/penalties/{{penaltyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "penalties",
+                "{{penaltyId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Record a penalty payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/penalties/{{penaltyId}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "penalties",
+                "{{penaltyId}}",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 5000,\n  \"method\": \"CASH\",\n  \"reference\": null,\n  \"paidOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Waive a penalty",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/penalties/{{penaltyId}}/waive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "penalties",
+                "{{penaltyId}}",
+                "waive"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"First offence\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Chairperson by default (PENALTY_WAIVE)."
+          }
+        },
+        {
+          "name": "Assess late contributions now",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/penalties/assess",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "penalties",
+                "assess"
+              ]
+            }
+          }
+        },
+        {
+          "name": "My penalties",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/penalties/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "penalties",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Needs the PENALTIES licence feature."
+    },
+    {
+      "name": "Loans",
+      "item": [
+        {
+          "name": "My eligibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/eligibility",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "eligibility"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The limit (multiple of savings), interest, guarantor rules and any reasons the member cannot borrow."
+          }
+        },
+        {
+          "name": "Apply for a loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"principalMinor\": 1000000,\n  \"termMonths\": 6,\n  \"purpose\": \"School fees\",\n  \"guarantorUserIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Above the guarantor threshold (default KES 50,000) name guarantors, e.g. [\"{{guarantorUserId}}\", ...]."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.loan.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('loanId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My loans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Loans I was asked to guarantee",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/guarantees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "guarantees"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Answer a guarantee request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}/guarantee",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}",
+                "guarantee"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accept\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Send as the guarantor (log in as them first)."
+          }
+        },
+        {
+          "name": "Name another guarantor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}/guarantors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}",
+                "guarantors"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guarantorUserId\": \"{{guarantorUserId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel my application",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}",
+                "cancel"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List loans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING_APPROVAL",
+                  "disabled": true
+                },
+                {
+                  "key": "memberUserId",
+                  "value": "{{memberUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('loanId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "One loan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Good saver\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "One official's approval; approved once the quorum of distinct officials approve."
+          }
+        },
+        {
+          "name": "Reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Clear your arrears first\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Disburse",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}/disburse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}",
+                "disburse"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"MPESA\",\n  \"reference\": \"QKOUT{{$timestamp}}\",\n  \"disbursedOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The account it is paid from must hold enough."
+          }
+        },
+        {
+          "name": "Record a repayment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}/repayments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}",
+                "repayments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 183334,\n  \"method\": \"MPESA\",\n  \"reference\": \"QKIN{{$timestamp}}\",\n  \"paidOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Needs the LOANS licence feature. Member requests use {{memberToken}}; decisions use {{officialToken}}."
+    },
+    {
+      "name": "Expenses",
+      "item": [
+        {
+          "name": "Record an expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 300000,\n  \"payee\": \"Community Hall\",\n  \"description\": \"Hall hire for the AGM\",\n  \"accountCode\": \"5000\",\n  \"investmentId\": null,\n  \"incurredOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Treasurer (EXPENSE_CREATE). Awaits approval by the quorum of officials other than the requester. Set investmentId to charge it to an active investment, e.g. the Airbnb's rent."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('expenseId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List expenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING_APPROVAL",
+                  "disabled": true
+                },
+                {
+                  "key": "investmentId",
+                  "value": "{{investmentId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Every member can see every expense."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('expenseId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Spending summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/summary?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-11-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-11-30",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Defaults to this month."
+          }
+        },
+        {
+          "name": "One expense",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Agreed at the meeting\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Chairperson or secretary by default (EXPENSE_APPROVE); not whoever recorded it."
+          }
+        },
+        {
+          "name": "Reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Members bring lunch\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}",
+                "cancel"
+              ]
+            },
+            "description": "Only whoever recorded it."
+          }
+        },
+        {
+          "name": "Pay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "expenses",
+                "{{expenseId}}",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"MPESA\",\n  \"reference\": \"QKEXP{{$timestamp}}\",\n  \"paidOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Posts Dr the expense account, Cr cash/bank/M-Pesa. The account must hold enough."
+          }
+        }
+      ],
+      "description": "Needs the EXPENSES licence feature. Requests use {{officialToken}}: log in as the right official."
+    },
+    {
+      "name": "Investments",
+      "item": [
+        {
+          "name": "Propose an investment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sanlam money market fund\",\n  \"type\": \"MONEY_MARKET_FUND\",\n  \"institution\": \"Sanlam\",\n  \"description\": \"Surplus cash\",\n  \"amountMinor\": 5000000,\n  \"expectedReturnBasisPoints\": 1200,\n  \"maturityDate\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Treasurer (INVESTMENT_MANAGE). Types: MONEY_MARKET_FUND, FIXED_DEPOSIT, TREASURY_BILL, TREASURY_BOND, SACCO_SHARES, EQUITIES, LAND, BUSINESS, OTHER."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('investmentId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List investments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "MONEY_MARKET_FUND",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Every member can see every investment."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('investmentId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Portfolio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "portfolio"
+              ]
+            }
+          }
+        },
+        {
+          "name": "One investment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Agreed at the AGM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Chairperson or secretary by default (INVESTMENT_APPROVE); not whoever proposed it."
+          }
+        },
+        {
+          "name": "Reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Too risky\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "cancel"
+              ]
+            },
+            "description": "Only whoever proposed it."
+          }
+        },
+        {
+          "name": "Fund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/fund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "fund"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"MPESA\",\n  \"reference\": \"QKINV{{$timestamp}}\",\n  \"fundedOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Puts the approved amount in. The account must hold enough."
+          }
+        },
+        {
+          "name": "Deposit (top-up)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/deposits",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "deposits"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 1000000,\n  \"method\": \"MPESA\",\n  \"reference\": \"QKDEP{{$timestamp}}\",\n  \"depositedOn\": null,\n  \"note\": \"Airbnb bookings sent back to CIC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "More money into an active investment, e.g. topping up the money market fund. No new approval."
+          }
+        },
+        {
+          "name": "Record income",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/income",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "income"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 50000,\n  \"method\": \"REINVESTED\",\n  \"reference\": null,\n  \"receivedOn\": null,\n  \"note\": \"October interest\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "CASH, BANK, MPESA, or REINVESTED (stays in the investment and adds to its book value)."
+          }
+        },
+        {
+          "name": "Withdraw part",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/withdrawals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "withdrawals"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountMinor\": 1000000,\n  \"method\": \"MPESA\",\n  \"reference\": \"QKWD{{$timestamp}}\",\n  \"withdrawnOn\": null,\n  \"note\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Record a valuation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/valuations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "valuations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"valueMinor\": 5200000,\n  \"valuedOn\": null,\n  \"note\": \"October statement\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Informational: the books keep investments at cost until closed."
+          }
+        },
+        {
+          "name": "Close",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/investments/{{investmentId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "investments",
+                "{{investmentId}}",
+                "close"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proceedsMinor\": 4300000,\n  \"method\": \"MPESA\",\n  \"reference\": \"QKCL{{$timestamp}}\",\n  \"closedOn\": null,\n  \"note\": \"Redeemed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Proceeds less book value is posted as a gain or loss to 4200 Investment income."
+          }
+        }
+      ],
+      "description": "Needs the INVESTMENTS licence feature."
+    },
+    {
+      "name": "Ledger",
+      "item": [
+        {
+          "name": "Chart of accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "accounts"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.find(a => a.code === '1020').id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('accountId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add an account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"1011\",\n  \"name\": \"Second bank account\",\n  \"type\": \"ASSET\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Activate / deactivate an account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/accounts/{{accountId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "accounts",
+                "{{accountId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Account statement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/accounts/{{accountId}}/statement?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "accounts",
+                "{{accountId}}",
+                "statement"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "memberUserId",
+                  "value": "{{memberUserId}}",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Journal",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/entries?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "entries"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "sourceType",
+                  "value": "LOAN_DISBURSEMENT",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('entryId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "One entry",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/entries/{{entryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "entries",
+                "{{entryId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Post a manual entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/entries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "entries"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entryDate\": null,\n  \"description\": \"Bank charges for November\",\n  \"reference\": \"STMT-11\",\n  \"lines\": [\n    {\n      \"accountCode\": \"5100\",\n      \"debitMinor\": 15000,\n      \"memo\": \"Monthly fee\"\n    },\n    {\n      \"accountCode\": \"1010\",\n      \"creditMinor\": 15000\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('entryId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reverse an entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/entries/{{entryId}}/reverse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "entries",
+                "{{entryId}}",
+                "reverse"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Posted twice\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Trial balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/trial-balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "trial-balance"
+              ]
+            }
+          }
+        },
+        {
+          "name": "My balances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ledger/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ledger",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit log",
+      "item": [
+        {
+          "name": "Audit log",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit-log?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit-log"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "LOAN_APPROVED",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 package ke.chama.modules.member.application.service;
 
+import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.modules.member.application.port.out.MembershipRepository;
 import ke.chama.modules.member.application.port.out.RolePermissionRepository;
 import ke.chama.modules.member.domain.model.MembershipStatus;
@@ -31,21 +32,24 @@ public class ChamaAccess {
         this.memberships = memberships;
     }
 
-    public boolean has(UUID chamaId, String permission) {
+    /** The caller holds {@code permission} in their own chama (the tenant of their token). */
+    public boolean has(String permission) {
         Optional<AuthenticatedUser> user = CurrentUser.find();
-        if (chamaId == null || user.isEmpty()) {
+        Optional<UUID> chamaId = TenantContext.id().filter(id -> !TenantContext.PLATFORM.equals(id));
+        if (chamaId.isEmpty() || user.isEmpty()) {
             return false;
         }
-        return rolePermissions.effectivePermissions(chamaId, user.get().userId())
+        return rolePermissions.effectivePermissions(chamaId.get(), user.get().userId())
                 .contains(ChamaPermission.valueOf(permission));
     }
 
-    public boolean isActiveMember(UUID chamaId) {
+    public boolean isActiveMember() {
         Optional<AuthenticatedUser> user = CurrentUser.find();
-        if (chamaId == null || user.isEmpty()) {
+        Optional<UUID> chamaId = TenantContext.id().filter(id -> !TenantContext.PLATFORM.equals(id));
+        if (chamaId.isEmpty() || user.isEmpty()) {
             return false;
         }
-        return memberships.findByChamaIdAndUserIdAndStatus(chamaId, user.get().userId(), MembershipStatus.ACTIVE)
+        return memberships.findByChamaIdAndUserIdAndStatus(chamaId.get(), user.get().userId(), MembershipStatus.ACTIVE)
                 .isPresent();
     }
 }

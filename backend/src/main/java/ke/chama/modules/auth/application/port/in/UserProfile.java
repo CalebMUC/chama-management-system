@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 /** Read model of a user, so entities never leave the application layer. */
 public record UserProfile(UUID id,
+                          UUID tenantId,
                           String email,
                           boolean emailVerified,
                           String phoneNumber,
@@ -19,7 +20,7 @@ public record UserProfile(UUID id,
                           Instant createdAt) {
 
     public static UserProfile from(User user) {
-        return new UserProfile(user.getId(), user.getEmail(), user.isEmailVerified(), user.getPhoneNumber(),
+        return new UserProfile(user.getId(), user.getTenantId(), user.getEmail(), user.isEmailVerified(), user.getPhoneNumber(),
                 user.getFirstName(), user.getLastName(),
                 user.getRoles().stream().map(Role::getName).collect(Collectors.toUnmodifiableSet()),
                 user.getCreatedAt());

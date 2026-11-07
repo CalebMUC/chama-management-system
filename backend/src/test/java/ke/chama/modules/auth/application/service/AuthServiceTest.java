@@ -1,5 +1,8 @@
 package ke.chama.modules.auth.application.service;
 
+import ke.chama.modules.auth.application.port.in.AuthTokens;
+import ke.chama.shared.tenancy.TenantContext;
+import java.util.UUID;
 import ke.chama.modules.auth.application.AuthProperties;
 import ke.chama.modules.auth.application.port.in.LoginCommand;
 import ke.chama.modules.auth.application.port.out.AccessTokenIssuer;
@@ -53,7 +56,14 @@ class AuthServiceTest {
     private final PasswordHasher hasher = mock(PasswordHasher.class);
     private final AccessTokenIssuer issuer = mock(AccessTokenIssuer.class);
 
+    private static final UUID CHAMA = UUID.randomUUID();
+
     private AuthService service;
+
+    /** Login looks accounts up in the chama the request names, so it needs a tenant. */
+    private AuthTokens loginToChama(LoginCommand command) {
+        return TenantContext.callAs(CHAMA, "test-chama", () -> service.login(command));
+    }
 
     @BeforeEach
     void setUp() {
@@ -78,7 +88,7 @@ class AuthServiceTest {
     void unknownEmailStillPaysForAPasswordCheckAndIsRecorded() {
         when(users.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.login(new LoginCommand("ghost@example.com", "whatever1", "10.0.0.7", "curl")))
+        assertThatThrownBy(() -> loginToChama(new LoginCommand("ghost@example.com", "whatever1", "10.0.0.7", "curl")))
                 .isInstanceOf(InvalidCredentialsException.class);
 
         verify(hasher).matches("whatever1", "{bcrypt}dummy");
@@ -96,7 +106,7 @@ class AuthServiceTest {
                 NOW.minusSeconds(240), NOW.minusSeconds(300));
         when(attempts.recentBadCredentialTimes(eq("jane@example.com"), any(), eq(5))).thenReturn(fiveFailures);
 
-        assertThatThrownBy(() -> service.login(new LoginCommand("jane@example.com", "Correct2026")))
+        assertThatThrownBy(() -> loginToChama(new LoginCommand("jane@example.com", "Correct2026")))
                 .isInstanceOfSatisfying(AccountLockedException.class, e ->
                         assertThat(e.retryAfter()).isEqualTo(LOCKOUT.minusSeconds(300)));
 
@@ -105,7 +115,7 @@ class AuthServiceTest {
 
     @Test
     void overlongPasswordIsRejectedWithoutTouchingTheDatabase() {
-        assertThatThrownBy(() -> service.login(new LoginCommand("a@b.co", "p".repeat(73))))
+        assertThatThrownBy(() -> loginToChama(new LoginCommand("a@b.co", "p".repeat(73))))
                 .isInstanceOf(InvalidCredentialsException.class);
 
         verify(users, never()).findByEmail(anyString());
@@ -113,7 +123,7 @@ class AuthServiceTest {
 
     @Test
     void losingARefreshRaceRevokesAllSessions() {
-        User user = new User("a@b.co", "0712345678", "{bcrypt}x", "A", "B");
+        User user = new User(CHAMA, "a@b.co", "0712345678", "{bcrypt}x", "A", "B");
         RefreshToken token = new RefreshToken(user, "hash", NOW.plus(Duration.ofDays(1)));
         when(refreshTokens.findByTokenHash(anyString())).thenReturn(Optional.of(token));
         when(refreshTokens.revokeIfActive(any(), eq(NOW), eq(RevocationReason.ROTATED))).thenReturn(0);

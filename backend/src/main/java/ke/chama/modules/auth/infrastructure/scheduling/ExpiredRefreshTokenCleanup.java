@@ -1,5 +1,8 @@
 package ke.chama.modules.auth.infrastructure.scheduling;
 
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.modules.auth.application.port.out.LoginAttemptRepository;
 import ke.chama.modules.auth.application.port.out.OneTimeTokenRepository;
 import ke.chama.modules.auth.application.port.out.RefreshTokenRepository;
@@ -7,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -30,20 +32,27 @@ class ExpiredRefreshTokenCleanup {
     private final OneTimeTokenRepository oneTimeTokens;
     private final LoginAttemptRepository loginAttempts;
     private final Clock clock;
+    private final TransactionTemplate transaction;
 
     ExpiredRefreshTokenCleanup(RefreshTokenRepository refreshTokens,
                                OneTimeTokenRepository oneTimeTokens,
                                LoginAttemptRepository loginAttempts,
-                               Clock clock) {
+                               Clock clock,
+                               PlatformTransactionManager transactionManager) {
         this.refreshTokens = refreshTokens;
         this.oneTimeTokens = oneTimeTokens;
         this.loginAttempts = loginAttempts;
         this.clock = clock;
+        this.transaction = new TransactionTemplate(transactionManager);
     }
 
     @Scheduled(cron = "${chama.auth.token-cleanup-cron:0 30 2 * * *}", zone = "${chama.time-zone:Africa/Nairobi}")
-    @Transactional
     void purge() {
+        // Housekeeping spans every chama, so it runs in system mode (no tenant filter).
+        TenantContext.runAsSystem(() -> transaction.executeWithoutResult(status -> purgeAllTenants()));
+    }
+
+    private void purgeAllTenants() {
         Instant now = clock.instant();
         int sessions = refreshTokens.deleteExpiredBefore(now.minus(TOKEN_RETENTION_AFTER_EXPIRY));
         int links = oneTimeTokens.deleteExpiredBefore(now.minus(TOKEN_RETENTION_AFTER_EXPIRY));

@@ -30,6 +30,7 @@
 		<java.version>25</java.version>
 		<spring-modulith.version>2.1.2</spring-modulith.version>
 		<archunit.version>1.4.2</archunit.version>
+		<springdoc.version>3.1.1</springdoc.version>
 	</properties>
 
 	<dependencyManagement>
@@ -98,6 +99,12 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<!-- OpenAPI docs + Swagger UI (3.x is the line for Spring Boot 4). Turned off under 'prod'. -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.flywaydb</groupId>

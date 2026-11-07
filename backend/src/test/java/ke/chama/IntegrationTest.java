@@ -14,12 +14,16 @@ import java.lang.annotation.Target;
  * Full application + real PostgreSQL + MockMvc. Every integration test uses this exact
  * annotation so Spring caches one context and one container for the whole run.
  * <p>
- * The database is shared between tests: use unique data (e.g. random emails), not cleanup.
+ * The database is shared between tests: use unique data (a fresh chama per test via
+ * {@link TestAccounts#onboard}), not cleanup. A platform administrator exists for every run.
  * Skipped when Docker is not running.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest
+@SpringBootTest(properties = {
+        "chama.platform.admin.email=" + TestAccounts.PLATFORM_ADMIN_EMAIL,
+        "chama.platform.admin.password=" + TestAccounts.PASSWORD
+})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @Testcontainers(disabledWithoutDocker = true)

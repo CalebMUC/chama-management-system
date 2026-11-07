@@ -7,7 +7,8 @@ import java.util.UUID;
 /**
  * One accountable action.
  *
- * @param chamaId     the chama it happened in; null for platform-level actions
+ * @param chamaId     the chama (tenant) it happened in. Platform actions on a chama, such as
+ *                    licence changes, are recorded in that chama's log.
  * @param actorUserId who did it; null only for system jobs
  * @param action      stable UPPER_SNAKE name, e.g. {@code MEMBER_SUSPENDED}
  * @param targetType  what was acted on, e.g. {@code MEMBERSHIP}

@@ -28,10 +28,16 @@ spring:
         jdbc:
           time_zone: UTC
 
+  # Flyway migrates as the schema owner through its own connection. The application itself
+  # switches every connection to the restricted role chama_app, which is subject to row-level
+  # security (see chama.tenancy below and V9).
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    url: ${DB_URL:jdbc:postgresql://localhost:15432/chama_db}
+    user: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
 
   data:
     redis:
@@ -43,10 +49,6 @@ spring:
     port: ${RABBITMQ_PORT:15673}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
-
-  mvc:
-    problemdetails:
-      enabled: true
 
   # Local default is Mailpit from docker-compose (web UI: http://localhost:18025).
   mail:
@@ -78,6 +80,18 @@ spring:
 
 chama:
   time-zone: Africa/Nairobi
+  # Every chama is a tenant sharing one database. Tenant rows are isolated by Hibernate and by
+  # PostgreSQL row-level security; the application runs as this role so the policies apply.
+  tenancy:
+    database-role: chama_app
+  licensing:
+    trial-length: 30d
+  # The first platform administrator, created at startup if both are set. Platform admins log in
+  # without an X-Chama-Code header, onboard chamas and manage their licences.
+  platform:
+    admin:
+      email: ${PLATFORM_ADMIN_EMAIL:}
+      password: ${PLATFORM_ADMIN_PASSWORD:}
   # Where emailed links point (verification, password reset, invitations).
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
   auth:
@@ -119,3 +133,15 @@ logging:
     ke.chama: DEBUG
     org.springframework.security: INFO
     org.hibernate.SQL: INFO
+
+# API docs: http://localhost:8080/swagger-ui.html (JSON at /v3/api-docs). Off under 'prod'.
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    persist-authorization: true   # keep the pasted access token across page reloads
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  default-produces-media-type: application/json

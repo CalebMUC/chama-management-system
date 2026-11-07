@@ -1,5 +1,7 @@
 package ke.chama.modules.auth.application.service;
 
+import ke.chama.modules.auth.api.UserProvisioning;
+import ke.chama.modules.auth.api.UserSummary;
 import ke.chama.modules.auth.application.AuthProperties;
 import ke.chama.modules.auth.application.port.in.AuthTokens;
 import ke.chama.modules.auth.application.port.in.GetUserProfileUseCase;
@@ -31,6 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import ke.chama.shared.tenancy.TenantContext;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -42,7 +46,7 @@ import java.util.UUID;
 @Service
 @Transactional
 public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSessionUseCase,
-        LogoutUseCase, GetUserProfileUseCase {
+        LogoutUseCase, GetUserProfileUseCase, UserProvisioning {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
@@ -86,8 +90,29 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
         this.timingEqualizerHash = passwordHasher.hash(OpaqueTokens.generate());
     }
 
+    /**
+     * Self-registration into the chama named by the request ({@code X-Chama-Code}). The new
+     * account applies for membership; a chama official approves it. Nobody can self-register
+     * into the platform tenant.
+     */
     @Override
     public UserProfile register(RegisterUserCommand command) {
+        User user = create(TenantContext.requireChama(), command, true);
+        log.info("Registered user {} in chama {}", user.getId(), user.getTenantId());
+        return UserProfile.from(user);
+    }
+
+    /** For other modules, e.g. a new chama's first administrator. Runs in the caller's transaction. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UserSummary createAccount(NewAccount account) {
+        User user = create(TenantContext.requireId(), new RegisterUserCommand(account.email(), account.phoneNumber(),
+                account.password(), account.firstName(), account.lastName()), false);
+        return new UserSummary(user.getId(), user.getEmail(), user.isEmailVerified(), user.getPhoneNumber(),
+                user.getFirstName(), user.getLastName(), user.isEnabled());
+    }
+
+    private User create(UUID tenantId, RegisterUserCommand command, boolean selfRegistered) {
         Instant now = clock.instant();
         String email = User.normalizeEmail(command.email());
         if (users.existsByEmail(email)) {
@@ -98,14 +123,12 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
         Role defaultRole = roles.findByName(Role.USER)
                 .orElseThrow(() -> new IllegalStateException(Role.USER + " is missing; check the auth migrations"));
 
-        User user = User.register(email, command.phoneNumber(), passwordHasher.hash(command.password()),
-                command.firstName(), command.lastName(), defaultRole, now);
+        User user = User.register(tenantId, email, command.phoneNumber(), passwordHasher.hash(command.password()),
+                command.firstName(), command.lastName(), defaultRole, selfRegistered, now);
         users.save(user);
         user.pullDomainEvents().forEach(events::publishEvent);
         accountLinks.sendEmailVerification(user, now);
-
-        log.info("Registered user {}", user.getId());
-        return UserProfile.from(user);
+        return user;
     }
 
     /**
@@ -115,6 +138,8 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
     @Override
     @Transactional(noRollbackFor = AuthException.class)
     public AuthTokens login(LoginCommand command) {
+        // Accounts are looked up in the chama the request names; fail clearly on an unknown code.
+        TenantContext.requireId();
         Instant now = clock.instant();
         String password = command.password() == null ? "" : command.password();
         if (PasswordPolicy.exceedsMaxBytes(password)) {

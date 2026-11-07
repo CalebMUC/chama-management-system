@@ -1,5 +1,7 @@
 package ke.chama.modules.notification.application.service;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import ke.chama.modules.member.domain.event.MemberInvited;
 import ke.chama.modules.member.domain.event.MembershipActivated;
 import ke.chama.modules.notification.application.port.out.EmailMessage;
@@ -24,17 +26,20 @@ class MembershipEmailNotifier {
 
     @ApplicationModuleListener
     void on(MemberInvited event) {
+        String joinUrl = frontendBaseUrl + "/join?chama=" + URLEncoder.encode(event.chamaCode(), StandardCharsets.UTF_8);
         emailSender.send(new EmailMessage(event.email(), "You're invited to join " + event.chamaName(), """
                 Hello,
 
                 %s has invited you to join %s.
 
-                To accept, open %s/invitations
-                If you don't have an account yet, register with this email address (%s)
-                and verify it; the invitation will then appear in your account.
+                Create your account here: %s
+                (or register in the app with the chama code: %s)
+
+                Use this email address (%s). After you register, a chama official will approve
+                your membership.
 
                 If you weren't expecting this invitation, you can ignore this email.
-                """.formatted(event.invitedByName(), event.chamaName(), frontendBaseUrl, event.email())));
+                """.formatted(event.invitedByName(), event.chamaName(), joinUrl, event.chamaCode(), event.email())));
     }
 
     @ApplicationModuleListener

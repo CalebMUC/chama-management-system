@@ -3,6 +3,7 @@ package ke.chama.modules.member.domain.model;
 import jakarta.persistence.*;
 import ke.chama.modules.member.domain.exception.InvalidMembershipStateException;
 import ke.chama.shared.domain.AggregateRoot;
+import org.hibernate.annotations.TenantId;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -14,11 +15,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * One person's membership in one chama: lifecycle (see {@link MembershipStatus}) and roles.
- * Every transition records who did it and when.
- * <p>
- * {@code userId} is null until the invitee accepts; the invitation is addressed by email
- * because the person may not have an account yet.
+ * A user's membership of their chama: lifecycle (see {@link MembershipStatus}) and roles.
+ * Every user belongs to exactly one chama, so there is exactly one membership per user, created
+ * when they register. Every transition records who did it and when.
  */
 @Entity
 @Table(name = "memberships", schema = "member")
@@ -27,14 +26,16 @@ public class Membership extends AggregateRoot {
     @Id
     private UUID id;
 
-    @Column(name = "chama_id", nullable = false, updatable = false)
+    /** The chama (tenant). Hibernate checks it matches the current tenant on insert. */
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
     private UUID chamaId;
 
-    @Column(name = "user_id")
+    @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    @Column(name = "invited_email", nullable = false, updatable = false)
-    private String invitedEmail;
+    @Column(name = "email", nullable = false)
+    private String email;
 
     /** Human-friendly number within the chama (1, 2, 3...), assigned when approved. */
     @Column(name = "member_number")
@@ -50,14 +51,8 @@ public class Membership extends AggregateRoot {
     @Column(name = "role", nullable = false, length = 30)
     private Set<ChamaRole> roles = new HashSet<>();
 
-    @Column(name = "invited_by")
-    private UUID invitedBy;
-
-    @Column(name = "invited_at", nullable = false)
-    private Instant invitedAt;
-
-    @Column(name = "responded_at")
-    private Instant respondedAt;
+    @Column(name = "applied_at", nullable = false)
+    private Instant appliedAt;
 
     @Column(name = "decided_by")
     private UUID decidedBy;
@@ -81,45 +76,29 @@ public class Membership extends AggregateRoot {
     protected Membership() {
     }
 
-    private Membership(UUID chamaId, String email, MembershipStatus status, Instant now) {
+    private Membership(UUID chamaId, UUID userId, String email, MembershipStatus status, Instant now) {
         this.id = UUID.randomUUID();
-        this.chamaId = Objects.requireNonNull(chamaId);
-        this.invitedEmail = normalizeEmail(email);
+        this.chamaId = Objects.requireNonNull(chamaId, "chamaId");
+        this.userId = Objects.requireNonNull(userId, "userId");
+        this.email = normalizeEmail(email);
         this.status = status;
-        this.invitedAt = now;
+        this.appliedAt = now;
         this.roles.add(ChamaRole.MEMBER);
     }
 
-    /** The person who created the chama: active immediately, member #1, chairperson. */
+    /** The chama's first administrator: active immediately, member #1, chairperson. */
     public static Membership founder(UUID chamaId, UUID userId, String email, Instant now) {
-        Membership membership = new Membership(chamaId, email, MembershipStatus.ACTIVE, now);
-        membership.userId = userId;
+        Membership membership = new Membership(chamaId, userId, email, MembershipStatus.ACTIVE, now);
         membership.memberNumber = 1;
         membership.joinedAt = now;
         membership.decidedAt = now;
-        membership.respondedAt = now;
         membership.roles.add(ChamaRole.CHAIRPERSON);
         return membership;
     }
 
-    public static Membership invite(UUID chamaId, String email, UUID invitedBy, Instant now) {
-        Membership membership = new Membership(chamaId, email, MembershipStatus.INVITED, now);
-        membership.invitedBy = invitedBy;
-        return membership;
-    }
-
-    public void accept(UUID acceptingUserId, Instant now) {
-        requireStatus("accept", MembershipStatus.INVITED);
-        this.userId = Objects.requireNonNull(acceptingUserId);
-        this.status = MembershipStatus.PENDING_APPROVAL;
-        this.respondedAt = now;
-    }
-
-    public void decline(UUID decliningUserId, Instant now) {
-        requireStatus("decline", MembershipStatus.INVITED);
-        this.userId = decliningUserId;
-        this.status = MembershipStatus.DECLINED;
-        this.respondedAt = now;
+    /** Someone registered with the chama's code: they wait for an official's approval. */
+    public static Membership application(UUID chamaId, UUID userId, String email, Instant now) {
+        return new Membership(chamaId, userId, email, MembershipStatus.PENDING_APPROVAL, now);
     }
 
     public void approve(UUID approverId, int assignedMemberNumber, Instant now) {
@@ -172,11 +151,7 @@ public class Membership extends AggregateRoot {
     }
 
     public boolean belongsTo(UUID someUserId) {
-        return userId != null && userId.equals(someUserId);
-    }
-
-    public boolean isAddressedTo(String email) {
-        return email != null && invitedEmail.equals(normalizeEmail(email));
+        return userId.equals(someUserId);
     }
 
     private void requireStatus(String action, MembershipStatus required) {
@@ -201,8 +176,8 @@ public class Membership extends AggregateRoot {
         return userId;
     }
 
-    public String getInvitedEmail() {
-        return invitedEmail;
+    public String getEmail() {
+        return email;
     }
 
     public Integer getMemberNumber() {
@@ -217,12 +192,8 @@ public class Membership extends AggregateRoot {
         return Collections.unmodifiableSet(roles);
     }
 
-    public UUID getInvitedBy() {
-        return invitedBy;
-    }
-
-    public Instant getInvitedAt() {
-        return invitedAt;
+    public Instant getAppliedAt() {
+        return appliedAt;
     }
 
     public Instant getJoinedAt() {

@@ -1,5 +1,9 @@
 package ke.chama.modules.auth;
 
+import ke.chama.TestAccounts;
+import ke.chama.TestcontainersConfiguration.OwnerJdbc;
+import ke.chama.shared.tenancy.TenantContext;
+import org.junit.jupiter.api.BeforeEach;
 import com.jayway.jsonpath.JsonPath;
 import ke.chama.IntegrationTest;
 import ke.chama.RecordingEmailSender;
@@ -32,10 +36,22 @@ class AccountRecoveryIntegrationTests {
     MockMvc mvc;
 
     @Autowired
-    JdbcTemplate jdbc;
+    OwnerJdbc owner;
 
     @Autowired
     RecordingEmailSender emails;
+
+    /** Direct SQL runs as the owner: the application role only ever sees one tenant's rows. */
+    JdbcTemplate jdbc;
+
+    /** Every test works in a chama of its own; public auth calls name it with X-Chama-Code. */
+    String chama;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        jdbc = owner.jdbc();
+        chama = new TestAccounts(mvc, emails).newChama();
+    }
 
     @Nested
     class EmailVerification {
@@ -44,14 +60,14 @@ class AccountRecoveryIntegrationTests {
         void registrationSendsALinkThatVerifiesTheEmail() throws Exception {
             String email = registered();
             EmailMessage message = emails.awaitEmail(email, s -> s.contains("Verify"));
-            assertThat(message.body()).contains("http://localhost:3000/verify-email?token=");
+            assertThat(message.body()).contains("http://localhost:3000/verify-email?chama=" + chama + "&token=");
 
             post("/api/v1/auth/email/verify", "{\"token\":\"%s\"}".formatted(RecordingEmailSender.tokenFrom(message)))
-                    .andExpect(status().isNoContent());
+                    .andExpect(status().isOk());
 
             String access = accessToken(email, PASSWORD);
             mvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + access))
-                    .andExpect(jsonPath("$.emailVerified").value(true));
+                    .andExpect(jsonPath("$.data.emailVerified").value(true));
         }
 
         @Test
@@ -59,10 +75,10 @@ class AccountRecoveryIntegrationTests {
             String email = registered();
             String token = RecordingEmailSender.tokenFrom(emails.awaitEmail(email, s -> s.contains("Verify")));
 
-            post("/api/v1/auth/email/verify", "{\"token\":\"%s\"}".formatted(token)).andExpect(status().isNoContent());
+            post("/api/v1/auth/email/verify", "{\"token\":\"%s\"}".formatted(token)).andExpect(status().isOk());
             post("/api/v1/auth/email/verify", "{\"token\":\"%s\"}".formatted(token))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("AUTH_LINK_INVALID"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_LINK_INVALID"));
         }
 
         @Test
@@ -77,7 +93,7 @@ class AccountRecoveryIntegrationTests {
 
             assertThat(second).isNotEqualTo(first);
             post("/api/v1/auth/email/verify", "{\"token\":\"%s\"}".formatted(first)).andExpect(status().isBadRequest());
-            post("/api/v1/auth/email/verify", "{\"token\":\"%s\"}".formatted(second)).andExpect(status().isNoContent());
+            post("/api/v1/auth/email/verify", "{\"token\":\"%s\"}".formatted(second)).andExpect(status().isOk());
         }
 
         @Test
@@ -104,15 +120,15 @@ class AccountRecoveryIntegrationTests {
         @Test
         void resetLinkSetsANewPasswordAndEndsEverySession() throws Exception {
             String email = registered();
-            String oldRefresh = JsonPath.read(login(email, PASSWORD).andReturn().getResponse().getContentAsString(), "$.refreshToken");
+            String oldRefresh = JsonPath.read(login(email, PASSWORD).andReturn().getResponse().getContentAsString(), "$.data.refreshToken");
 
             post("/api/v1/auth/password/forgot", "{\"email\":\"%s\"}".formatted(email)).andExpect(status().isAccepted());
             EmailMessage message = emails.awaitEmail(email, s -> s.contains("Reset"));
-            assertThat(message.body()).contains("http://localhost:3000/reset-password?token=");
+            assertThat(message.body()).contains("http://localhost:3000/reset-password?chama=" + chama + "&token=");
 
             post("/api/v1/auth/password/reset", """
                     {"token":"%s","newPassword":"%s"}""".formatted(RecordingEmailSender.tokenFrom(message), NEW_PASSWORD))
-                    .andExpect(status().isNoContent());
+                    .andExpect(status().isOk());
 
             login(email, PASSWORD).andExpect(status().isUnauthorized());
             login(email, NEW_PASSWORD).andExpect(status().isOk());
@@ -135,7 +151,7 @@ class AccountRecoveryIntegrationTests {
             post("/api/v1/auth/password/forgot", "{\"email\":\"%s\"}".formatted(email));
             String token = RecordingEmailSender.tokenFrom(emails.awaitEmail(email, s -> s.contains("Reset")));
             post("/api/v1/auth/password/reset", """
-                    {"token":"%s","newPassword":"%s"}""".formatted(token, NEW_PASSWORD)).andExpect(status().isNoContent());
+                    {"token":"%s","newPassword":"%s"}""".formatted(token, NEW_PASSWORD)).andExpect(status().isOk());
 
             login(email, NEW_PASSWORD).andExpect(status().isOk());
             assertThat(jdbc.queryForObject("select email_verified_at is not null from auth.users where email = ?",
@@ -151,7 +167,7 @@ class AccountRecoveryIntegrationTests {
             post("/api/v1/auth/password/reset", """
                     {"token":"%s","newPassword":"short"}""".formatted(token)).andExpect(status().isBadRequest());
             post("/api/v1/auth/password/reset", """
-                    {"token":"%s","newPassword":"%s"}""".formatted(token, NEW_PASSWORD)).andExpect(status().isNoContent());
+                    {"token":"%s","newPassword":"%s"}""".formatted(token, NEW_PASSWORD)).andExpect(status().isOk());
         }
 
         @Test
@@ -168,7 +184,7 @@ class AccountRecoveryIntegrationTests {
             post("/api/v1/auth/password/reset", """
                     {"token":"forged-token","newPassword":"%s"}""".formatted(NEW_PASSWORD))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("AUTH_LINK_INVALID"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_LINK_INVALID"));
         }
     }
 
@@ -179,17 +195,17 @@ class AccountRecoveryIntegrationTests {
         void requiresTheCurrentPasswordAndKeepsThisDeviceLoggedIn() throws Exception {
             String email = registered();
             String body = login(email, PASSWORD).andReturn().getResponse().getContentAsString();
-            String access = JsonPath.read(body, "$.accessToken");
+            String access = JsonPath.read(body, "$.data.accessToken");
             String otherDeviceRefresh = JsonPath.read(login(email, PASSWORD).andReturn().getResponse().getContentAsString(),
-                    "$.refreshToken");
+                    "$.data.refreshToken");
 
             changePassword(access, "Wrong2026pass", NEW_PASSWORD)
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("AUTH_CURRENT_PASSWORD_INCORRECT"));
+                    .andExpect(jsonPath("$.error.code").value("AUTH_CURRENT_PASSWORD_INCORRECT"));
 
             String newRefresh = JsonPath.read(changePassword(access, PASSWORD, NEW_PASSWORD)
                     .andExpect(status().isOk())
-                    .andReturn().getResponse().getContentAsString(), "$.refreshToken");
+                    .andReturn().getResponse().getContentAsString(), "$.data.refreshToken");
 
             post("/api/v1/auth/refresh", "{\"refreshToken\":\"%s\"}".formatted(otherDeviceRefresh)).andExpect(status().isUnauthorized());
             post("/api/v1/auth/refresh", "{\"refreshToken\":\"%s\"}".formatted(newRefresh)).andExpect(status().isOk());
@@ -234,11 +250,12 @@ class AccountRecoveryIntegrationTests {
     }
 
     private String accessToken(String email, String password) throws Exception {
-        return JsonPath.read(login(email, password).andReturn().getResponse().getContentAsString(), "$.accessToken");
+        return JsonPath.read(login(email, password).andReturn().getResponse().getContentAsString(), "$.data.accessToken");
     }
 
     private ResultActions post(String url, String json) throws Exception {
         return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(url)
+                .header(TenantContext.HEADER, chama)
                 .contentType(MediaType.APPLICATION_JSON).content(json));
     }
 

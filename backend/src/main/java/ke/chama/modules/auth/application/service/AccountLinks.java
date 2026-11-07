@@ -1,5 +1,8 @@
 package ke.chama.modules.auth.application.service;
 
+import java.nio.charset.StandardCharsets;
+import java.net.URLEncoder;
+import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.modules.auth.application.AuthProperties;
 import ke.chama.modules.auth.application.port.out.OneTimeTokenRepository;
 import ke.chama.modules.auth.domain.event.EmailVerificationRequested;
@@ -81,6 +84,10 @@ class AccountLinks {
         tokens.invalidateActive(user.getId(), purpose, now);
         String raw = OpaqueTokens.generate();
         tokens.save(new OneTimeToken(user, purpose, OpaqueTokens.sha256Hex(raw), now, now.plus(ttl)));
-        return config.frontendBaseUrl() + path + "?token=" + raw;
+        // The chama code tells the frontend which X-Chama-Code to send when posting the token back.
+        String chama = TenantContext.code()
+                .map(code -> "chama=" + URLEncoder.encode(code, StandardCharsets.UTF_8) + "&")
+                .orElse("");
+        return config.frontendBaseUrl() + path + "?" + chama + "token=" + raw;
     }
 }

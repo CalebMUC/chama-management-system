@@ -39,6 +39,27 @@ class LoanEligibilityTest {
     }
 
     @Test
+    void loansOfOtherProductsUseUpPartOfTheLimit() {
+        // KES 20,000 of savings × 3 = KES 60,000, less KES 45,000 still owed on a normal loan.
+        LoanEligibility e = LoanEligibility.assess(RULES, "Emergency loan", 3, true, 2_000_000, 4_500_000,
+                TODAY.minusMonths(4), TODAY, false);
+
+        assertThat(e.eligible()).isTrue();
+        assertThat(e.maxLoanMinor()).isEqualTo(1_500_000);
+        e.requireAllows(1_500_000, 3);
+        assertThatThrownBy(() -> e.requireAllows(1_500_001, 3))
+                .hasMessageContaining("less KES 45,000.00 on your other loans");
+        assertThatThrownBy(() -> e.requireAllows(1_000_000, 4))
+                .hasMessageContaining("The longest term for an emergency loan is 3 months");
+
+        LoanEligibility full = LoanEligibility.assess(RULES, "Emergency loan", 3, true, 2_000_000, 6_000_000,
+                TODAY.minusMonths(4), TODAY, true);
+        assertThat(full.maxLoanMinor()).isZero();
+        assertThat(String.join(" ", full.reasons())).contains("already use up 3× your savings",
+                "already have an emergency loan in progress");
+    }
+
+    @Test
     void membershipCountsWholeMonths() {
         assertThat(LoanEligibility.assess(RULES, true, 1, TODAY.minusMonths(3).plusDays(1), TODAY, false).eligible())
                 .isFalse();

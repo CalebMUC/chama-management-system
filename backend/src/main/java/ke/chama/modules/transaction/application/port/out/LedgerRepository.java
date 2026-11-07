@@ -66,6 +66,9 @@ public interface LedgerRepository {
     /** Totals of one account, optionally for one member, dated before {@code before} (exclusive); null = all. */
     Totals accountTotals(UUID chamaId, UUID accountId, UUID memberUserId, LocalDate before);
 
+    /** Totals of one member-ledger account per member. */
+    Map<UUID, Totals> memberTotals(UUID chamaId, UUID accountId);
+
     /** A line of an account statement, oldest first. */
     record StatementRow(UUID entryId, long entryNumber, LocalDate entryDate, String description, String reference,
                         String sourceType, long debitMinor, long creditMinor, UUID memberUserId, String memo) {

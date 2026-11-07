@@ -15,7 +15,8 @@ import java.util.UUID;
  */
 public interface LoanUseCases {
 
-    EligibilityView eligibility(UUID chamaId, UUID memberUserId);
+    /** What the member may borrow under the product; the default product when {@code productId} is null. */
+    EligibilityView eligibility(UUID chamaId, UUID memberUserId, UUID productId);
 
     LoanDetailView apply(UUID chamaId, UUID borrowerUserId, Application application);
 
@@ -41,7 +42,12 @@ public interface LoanUseCases {
 
     List<GuaranteeView> guaranteeRequests(UUID chamaId, UUID memberUserId);
 
-    record Application(long principalMinor, int termMonths, String purpose, List<UUID> guarantorUserIds) {
+    /** @param productId the loan product applied for; null for the default product */
+    record Application(UUID productId, long principalMinor, int termMonths, String purpose, List<UUID> guarantorUserIds) {
+
+        public Application(long principalMinor, int termMonths, String purpose, List<UUID> guarantorUserIds) {
+            this(null, principalMinor, termMonths, purpose, guarantorUserIds);
+        }
     }
 
     /** A disbursement: how the money was paid out. */
@@ -52,14 +58,20 @@ public interface LoanUseCases {
     }
 
     /**
-     * What the member may borrow now. Amounts are minor units of {@code currency}.
+     * What the member may borrow now under one loan product. Amounts are minor units of {@code currency}.
      *
-     * @param reasons why the member cannot borrow; empty when {@code eligible}
+     * @param reasons         why the member cannot borrow; empty when {@code eligible}
+     * @param savingsMinor    savings in the products that count toward the loan limit
+     * @param otherLoansMinor owed or applied for on loans of other products, deducted from the limit
      */
     record EligibilityView(boolean eligible,
                            List<String> reasons,
+                           UUID productId,
+                           String productCode,
+                           String productName,
                            String currency,
                            long savingsMinor,
+                           long otherLoansMinor,
                            long maxLoanMinor,
                            int maxMultiplier,
                            int interestBasisPoints,
@@ -81,6 +93,9 @@ public interface LoanUseCases {
                     UUID borrowerUserId,
                     String borrowerName,
                     Integer memberNumber,
+                    UUID productId,
+                    String productCode,
+                    String productName,
                     long principalMinor,
                     int interestBasisPoints,
                     long interestMinor,

@@ -30,7 +30,7 @@ import java.util.UUID;
 class JdbcLoanRepository implements LoanRepository {
 
     private static final String COLUMNS = """
-            id, tenant_id, borrower_user_id, principal_minor, interest_bp, interest_minor, term_months, purpose, currency,
+            id, tenant_id, borrower_user_id, product_id, principal_minor, interest_bp, interest_minor, term_months, purpose, currency,
             applied_on, required_guarantors, required_approvals, status, rejected_by, rejected_at, rejection_reason,
             cancelled_at, disbursed_on, disbursed_by, disbursement_method, disbursement_reference, disbursement_entry_id,
             repaid_minor, created_at, version""";
@@ -45,17 +45,18 @@ class JdbcLoanRepository implements LoanRepository {
     @Override
     public void insert(Loan l) {
         jdbc.update("""
-                insert into loan.loans (id, tenant_id, borrower_user_id, principal_minor, interest_bp, interest_minor,
-                                        term_months, purpose, currency, applied_on, required_guarantors,
+                insert into loan.loans (id, tenant_id, borrower_user_id, product_id, principal_minor, interest_bp,
+                                        interest_minor, term_months, purpose, currency, applied_on, required_guarantors,
                                         required_approvals, status, disbursed_on, disbursed_by, disbursement_method,
                                         disbursement_reference, disbursement_entry_id, repaid_minor, created_at)
-                values (:id, :tenant, :borrower, :principal, :interestBp, :interest, :term, :purpose, :currency,
+                values (:id, :tenant, :borrower, :product, :principal, :interestBp, :interest, :term, :purpose, :currency,
                         :appliedOn, :requiredGuarantors, :requiredApprovals, :status, :disbursedOn, :disbursedBy,
                         :method, :reference, :entry, :repaid, :createdAt)""",
                 new MapSqlParameterSource()
                         .addValue("id", l.id())
                         .addValue("tenant", l.chamaId())
                         .addValue("borrower", l.borrowerUserId())
+                        .addValue("product", l.productId())
                         .addValue("principal", l.principalMinor())
                         .addValue("interestBp", l.interestBasisPoints())
                         .addValue("interest", l.interestMinor())
@@ -178,10 +179,10 @@ class JdbcLoanRepository implements LoanRepository {
     }
 
     @Override
-    public boolean hasOpenLoan(UUID chamaId, UUID borrowerUserId) {
+    public boolean hasOpenLoan(UUID chamaId, UUID borrowerUserId, UUID productId) {
         Boolean exists = jdbc.queryForObject("select exists (select 1 from loan.loans where tenant_id = :tenant"
-                        + " and borrower_user_id = :borrower and status in " + OPEN + ")",
-                Map.of("tenant", chamaId, "borrower", borrowerUserId), Boolean.class);
+                        + " and borrower_user_id = :borrower and product_id = :product and status in " + OPEN + ")",
+                Map.of("tenant", chamaId, "borrower", borrowerUserId, "product", productId), Boolean.class);
         return Boolean.TRUE.equals(exists);
     }
 
@@ -243,7 +244,7 @@ class JdbcLoanRepository implements LoanRepository {
     // ---- mapping --------------------------------------------------------------------------------
 
     /** A loans row before its guarantors and approvals are attached. */
-    private record Row(UUID id, UUID chamaId, UUID borrower, long principal, int interestBp, long interest, int term,
+    private record Row(UUID id, UUID chamaId, UUID borrower, UUID product, long principal, int interestBp, long interest, int term,
                        String purpose, String currency, LocalDate appliedOn, int requiredGuarantors,
                        int requiredApprovals, Loan.Status status, UUID rejectedBy, Instant rejectedAt, String reason,
                        Instant cancelledAt, LocalDate disbursedOn, UUID disbursedBy, String method, String reference,
@@ -252,7 +253,8 @@ class JdbcLoanRepository implements LoanRepository {
 
     private static Row row(ResultSet rs) throws SQLException {
         return new Row(rs.getObject("id", UUID.class), rs.getObject("tenant_id", UUID.class),
-                rs.getObject("borrower_user_id", UUID.class), rs.getLong("principal_minor"), rs.getInt("interest_bp"),
+                rs.getObject("borrower_user_id", UUID.class), rs.getObject("product_id", UUID.class),
+                rs.getLong("principal_minor"), rs.getInt("interest_bp"),
                 rs.getLong("interest_minor"), rs.getInt("term_months"), rs.getString("purpose"), rs.getString("currency"),
                 rs.getDate("applied_on").toLocalDate(), rs.getInt("required_guarantors"), rs.getInt("required_approvals"),
                 Loan.Status.valueOf(rs.getString("status")), rs.getObject("rejected_by", UUID.class),
@@ -287,7 +289,7 @@ class JdbcLoanRepository implements LoanRepository {
                     .add(new Loan.Approval(rs.getObject("approver_user_id", UUID.class), rs.getString("note"),
                             rs.getTimestamp("approved_at").toInstant()));
         });
-        return rows.stream().map(r -> new Loan(r.id(), r.chamaId(), r.borrower(), r.principal(), r.interestBp(),
+        return rows.stream().map(r -> new Loan(r.id(), r.chamaId(), r.borrower(), r.product(), r.principal(), r.interestBp(),
                 r.interest(), r.term(), r.purpose(), r.currency(), r.appliedOn(), r.requiredGuarantors(),
                 r.requiredApprovals(), guarantors.getOrDefault(r.id(), List.of()), approvals.getOrDefault(r.id(), List.of()),
                 r.status(), r.rejectedBy(), r.rejectedAt(), r.reason(), r.cancelledAt(), r.disbursedOn(), r.disbursedBy(),

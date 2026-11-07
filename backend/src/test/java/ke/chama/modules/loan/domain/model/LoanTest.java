@@ -15,6 +15,7 @@ class LoanTest {
 
     private static final UUID CHAMA = UUID.randomUUID();
     private static final UUID BORROWER = UUID.randomUUID();
+    private static final UUID PRODUCT = UUID.randomUUID();
     private static final UUID CHAIR = UUID.randomUUID();
     private static final UUID TREASURER = UUID.randomUUID();
     private static final UUID ALICE = UUID.randomUUID();
@@ -206,7 +207,7 @@ class LoanTest {
     }
 
     private static Loan apply(long principal, int term, String purpose, int guarantors, List<UUID> named) {
-        return Loan.apply(CHAMA, BORROWER, principal, term, purpose, "KES", 1_000, guarantors, 2, named, TODAY, NOW);
+        return Loan.apply(CHAMA, BORROWER, PRODUCT, principal, term, purpose, "KES", 1_000, guarantors, 2, named, TODAY, NOW);
     }
 
     private static Loan smallLoan(long principal, int term) {

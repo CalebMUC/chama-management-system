@@ -1,5 +1,8 @@
 package ke.chama.modules.dataimport.application.service;
 
+import ke.chama.modules.account.api.MemberAccounts;
+import ke.chama.modules.account.api.SavingsProductSummary;
+import ke.chama.modules.account.api.SavingsProducts;
 import ke.chama.modules.audit.api.AuditEntry;
 import ke.chama.modules.audit.api.AuditTrail;
 import ke.chama.modules.auth.api.UserDirectory;
@@ -31,6 +34,7 @@ import ke.chama.modules.member.api.MemberDirectory;
 import ke.chama.modules.member.api.MemberImport;
 import ke.chama.modules.member.api.MemberSummary;
 import ke.chama.modules.penalty.api.PenaltyImport;
+import ke.chama.modules.transaction.api.EntrySide;
 import ke.chama.modules.transaction.api.Ledger;
 import ke.chama.modules.transaction.api.LedgerAccountKey;
 import ke.chama.modules.transaction.api.PostingRequest;
@@ -84,6 +88,8 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
     private final PenaltyImport penaltyImport;
     private final InvestmentImport investmentImport;
     private final ContributionCalendar contributions;
+    private final SavingsProducts savingsProducts;
+    private final MemberAccounts memberAccounts;
     private final Ledger ledger;
     private final AuditTrail auditTrail;
     private final Clock clock;
@@ -93,8 +99,11 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
                                        MemberDirectory members, MemberImport memberImport, UserDirectory users,
                                        UserProvisioning provisioning, LoanImport loanImport, PenaltyImport penaltyImport,
                                        InvestmentImport investmentImport, ContributionCalendar contributions,
+                                       SavingsProducts savingsProducts, MemberAccounts memberAccounts,
                                        Ledger ledger, AuditTrail auditTrail, Clock clock,
                                        @Value("${chama.time-zone:Africa/Nairobi}") String timeZone) {
+        this.savingsProducts = savingsProducts;
+        this.memberAccounts = memberAccounts;
         this.spreadsheets = spreadsheets;
         this.records = records;
         this.chamas = chamas;
@@ -113,8 +122,9 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
     }
 
     @Override
-    public byte[] template() {
-        return spreadsheets.template(memberImport.roleNames(), investmentImport.typeNames());
+    public byte[] template(UUID chamaId) {
+        return spreadsheets.template(memberImport.roleNames(), investmentImport.typeNames(),
+                List.copyOf(otherSavingsColumns(chamaId).keySet()));
     }
 
     @Override
@@ -156,8 +166,18 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
                     userIds.put(m.email(), user.id());
                 });
 
-        // 2. One opening-balance entry for every amount brought forward.
-        UUID entryId = postOpeningEntry(chamaId, chama.currency(), plan, userIds, importId, actorUserId);
+        // 2. One opening-balance entry for every amount brought forward, and an account in every
+        //    optional savings product a member brings a balance into (mandatory ones open by themselves).
+        Map<String, SavingsProductSummary> columns = otherSavingsColumns(chamaId);
+        UUID entryId = postOpeningEntry(chamaId, chama.currency(), plan, userIds, columns, importId, actorUserId);
+        for (MemberBalance b : plan.balances()) {
+            for (String column : b.otherSavingsMinor().keySet()) {
+                SavingsProductSummary product = columns.get(column);
+                if (!product.mandatory()) {
+                    memberAccounts.ensureAccount(chamaId, userIds.get(b.email()), product.id(), plan.asOf(), actorUserId);
+                }
+            }
+        }
 
         // 3. The records behind the amounts.
         for (PlannedLoan l : plan.loans()) {
@@ -207,7 +227,7 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
     private OpeningBalancePlan plan(UUID chamaId, byte[] file, LocalDate asOf) {
         ChamaSummary chama = chamas.find(chamaId).orElseThrow();
         int digits = Math.max(Currency.getInstance(chama.currency()).getDefaultFractionDigits(), 0);
-        OpeningBalanceSheets sheets = spreadsheets.read(file, digits);
+        OpeningBalanceSheets sheets = spreadsheets.read(file, digits, List.copyOf(otherSavingsColumns(chamaId).keySet()));
 
         Map<String, UUID> seated = new HashMap<>();
         for (MemberSummary m : members.seatedMembers(chamaId)) {
@@ -224,8 +244,9 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
             String email = lower(row.email());
             UUID existing = seated.get(email);
             if (existing != null) {
-                existingSavings.put(existing,
-                        ledger.memberBalance(chamaId, existing, LedgerAccountKey.MEMBER_SAVINGS).minorUnits());
+                existingSavings.put(existing, savingsProducts.products(chamaId).stream()
+                        .mapToLong(p -> ledger.memberBalance(chamaId, existing, p.ledgerAccountCode()).minorUnits())
+                        .sum());
             } else if (users.findByEmail(email).isPresent()) {
                 otherAccounts.add(email);
             }
@@ -238,8 +259,23 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
         return OpeningBalanceCheck.check(sheets, asOf, context);
     }
 
+    /**
+     * The Members sheet's extra columns: one per active savings product besides the default (whose
+     * balances go in "Savings"), headed by the product's name and code, e.g. "Share capital (SHR, KES)".
+     */
+    private Map<String, SavingsProductSummary> otherSavingsColumns(UUID chamaId) {
+        String currency = chamas.find(chamaId).map(ChamaSummary::currency).orElse("KES");
+        Map<String, SavingsProductSummary> columns = new LinkedHashMap<>();
+        for (SavingsProductSummary p : savingsProducts.products(chamaId)) {
+            if (p.active() && !p.defaultProduct()) {
+                columns.put(p.name() + " (" + p.code() + ", " + currency + ")", p);
+            }
+        }
+        return columns;
+    }
+
     private UUID postOpeningEntry(UUID chamaId, String currencyCode, OpeningBalancePlan plan, Map<String, UUID> userIds,
-                                  UUID importId, UUID actorUserId) {
+                                  Map<String, SavingsProductSummary> columns, UUID importId, UUID actorUserId) {
         Currency currency = Currency.getInstance(currencyCode);
         List<PostingLine> lines = new ArrayList<>();
         debit(lines, LedgerAccountKey.CASH, plan.cashMinor(), currency, null, null);
@@ -259,6 +295,11 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
                 lines.add(PostingLine.credit(LedgerAccountKey.MEMBER_SAVINGS, Money.of(b.savingsMinor(), currency))
                         .forMember(userIds.get(b.email())));
             }
+            b.otherSavingsMinor().forEach((column, minor) -> {
+                SavingsProductSummary product = columns.get(column);
+                lines.add(new PostingLine(null, product.ledgerAccountCode(), EntrySide.CREDIT, Money.of(minor, currency),
+                        userIds.get(b.email()), product.name()));
+            });
         }
         long surplus = plan.retainedSurplusMinor();
         if (surplus > 0) {

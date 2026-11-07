@@ -19,6 +19,7 @@ import java.time.ZoneId;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -156,6 +157,38 @@ public class OpeningBalanceImportIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("opening-balances-template.xlsx")))
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, containsString("spreadsheetml")));
+    }
+
+    @Test
+    void balancesInOtherSavingsProductsComeInThroughTheirOwnColumns() throws Exception {
+        TestChama chama = accounts.onboard("Nduta");
+        mvc.perform(chama.chair().post("/api/v1/savings-products", """
+                        {"code":"SHR","name":"Share capital","kind":"SHARE_CAPITAL","contributionMinor":0,"mandatory":true}"""))
+                .andExpect(status().isCreated());
+        mvc.perform(chama.chair().post("/api/v1/savings-products", """
+                        {"code":"HOL","name":"Holiday savings","kind":"CUSTOM","contributionMinor":0,"mandatory":false}"""))
+                .andExpect(status().isCreated());
+        String alice = TestAccounts.uniqueEmail("alice");
+
+        // Columns after Penalties, in product order: Holiday savings (HOL), then Share capital (SHR).
+        byte[] file = Workbooks.from(template(chama.chair()))
+                .row("Members", alice, "Alice", "Wanjiku", "0712345601", asOf.minusYears(2), null, 10000, null, 500, 2000)
+                .setRow("Accounts", 2, "Cash on hand", 12500)
+                .bytes();
+
+        upload(chama.chair(), URL + "/preview", file)
+                .andExpect(jsonPath("$.data.importable").value(true))
+                .andExpect(jsonPath("$.data.summary.savingsMinor").value(1_250_000));
+        upload(chama.chair(), URL, file).andExpect(status().isCreated());
+
+        mvc.perform(chama.chair().get("/api/v1/ledger/accounts"))
+                .andExpect(jsonPath("$.data[?(@.code=='2000')].balanceMinor").value(1_000_000))
+                .andExpect(jsonPath("$.data[?(@.code=='2010')].balanceMinor").value(50_000))
+                .andExpect(jsonPath("$.data[?(@.code=='3100')].balanceMinor").value(200_000));
+        mvc.perform(chama.chair().get("/api/v1/member-accounts"))
+                .andExpect(jsonPath("$.data[?(@.productCode=='HOL')].balanceMinor").value(50_000))
+                // The chairperson's share account is empty; Alice's holds what she brought in.
+                .andExpect(jsonPath("$.data[?(@.productCode=='SHR')].balanceMinor").value(containsInAnyOrder(0, 200_000)));
     }
 
     @Test

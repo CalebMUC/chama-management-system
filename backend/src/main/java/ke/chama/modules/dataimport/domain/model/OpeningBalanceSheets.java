@@ -2,6 +2,7 @@ package ke.chama.modules.dataimport.domain.model;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -28,9 +29,22 @@ public record OpeningBalanceSheets(List<MemberRow> members,
         problems = List.copyOf(problems);
     }
 
-    /** @param roles role names as typed, e.g. "Treasurer"; empty means an ordinary member */
+    /**
+     * @param roles             role names as typed, e.g. "Treasurer"; empty means an ordinary member
+     * @param savingsMinor      the "Savings" column: the default savings product
+     * @param otherSavingsMinor the columns of other savings products, by heading; only filled cells
+     */
     public record MemberRow(int row, String email, String firstName, String lastName, String phone, LocalDate joinedOn,
-                            Set<String> roles, Long savingsMinor, Long penaltiesMinor) {
+                            Set<String> roles, Long savingsMinor, Long penaltiesMinor, Map<String, Long> otherSavingsMinor) {
+
+        public MemberRow {
+            otherSavingsMinor = otherSavingsMinor == null ? Map.of() : Map.copyOf(otherSavingsMinor);
+        }
+
+        public MemberRow(int row, String email, String firstName, String lastName, String phone, LocalDate joinedOn,
+                         Set<String> roles, Long savingsMinor, Long penaltiesMinor) {
+            this(row, email, firstName, lastName, phone, joinedOn, roles, savingsMinor, penaltiesMinor, Map.of());
+        }
     }
 
     public record LoanRow(int row, String memberEmail, Long principalMinor, Long interestMinor, Integer termMonths,

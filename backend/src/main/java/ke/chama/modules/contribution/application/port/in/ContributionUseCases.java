@@ -6,6 +6,7 @@ import ke.chama.modules.contribution.application.port.in.ContributionViews.Perio
 import ke.chama.modules.contribution.application.port.in.ContributionViews.PeriodSummaryView;
 import ke.chama.modules.contribution.application.port.in.ContributionViews.StandingView;
 import ke.chama.modules.contribution.domain.model.ContributionPayment;
+import ke.chama.modules.contribution.domain.model.PaymentAllocation.Allocation;
 import ke.chama.modules.contribution.domain.model.PaymentMethod;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,7 +21,10 @@ import java.util.UUID;
  */
 public interface ContributionUseCases {
 
-    /** Records money received from a member and posts it to their savings. Audit-logged. */
+    /**
+     * Records money received from a member and posts it to their savings accounts, split across
+     * their products (see {@code PaymentAllocation}). Audit-logged.
+     */
     PaymentView record(UUID chamaId, UUID actorUserId, RecordPayment payment);
 
     /** Reverses a payment and its ledger entry. Audit-logged. */
@@ -41,7 +45,13 @@ public interface ContributionUseCases {
 
     MyContributionsView mine(UUID chamaId, UUID memberUserId);
 
+    /** @param allocations how to split the payment across products; null to split it automatically */
     record RecordPayment(UUID memberUserId, long amountMinor, PaymentMethod method, String reference,
-                         LocalDate paidOn, String notes) {
+                         LocalDate paidOn, String notes, List<Allocation> allocations) {
+
+        public RecordPayment(UUID memberUserId, long amountMinor, PaymentMethod method, String reference,
+                             LocalDate paidOn, String notes) {
+            this(memberUserId, amountMinor, method, reference, paidOn, notes, null);
+        }
     }
 }

@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -119,6 +120,13 @@ public final class OpeningBalanceCheck {
             }
             long savings = amount(r.savingsMinor(), MEMBERS, r.row(), "Savings (KES)", problems);
             long penalties = amount(r.penaltiesMinor(), MEMBERS, r.row(), "Penalties owed (KES)", problems);
+            Map<String, Long> otherSavings = new LinkedHashMap<>();
+            r.otherSavingsMinor().forEach((column, value) -> {
+                long minor = amount(value, MEMBERS, r.row(), column, problems);
+                if (minor > 0) {
+                    otherSavings.put(column, minor);
+                }
+            });
 
             UUID existing = chama.seatedMembersByEmail().get(email);
             if (existing != null) {
@@ -127,11 +135,11 @@ public final class OpeningBalanceCheck {
                             + " is already a member: their roles are not changed by the import"));
                 }
                 long already = chama.existingSavingsMinor().getOrDefault(existing, 0L);
-                if (already > 0 && savings > 0) {
+                if (already > 0 && (savings > 0 || !otherSavings.isEmpty())) {
                     problems.add(Problem.warning(MEMBERS, r.row(), "Savings (KES)", email + " already has savings of "
                             + Amounts.format(already, chama.currency()) + " in the system; the imported amount is added to it"));
                 }
-                balances.add(new MemberBalance(email, existing, savings, penalties));
+                balances.add(new MemberBalance(email, existing, savings, penalties, otherSavings));
                 continue;
             }
             if (chama.otherAccountEmails().contains(email)) {
@@ -167,7 +175,7 @@ public final class OpeningBalanceCheck {
             if (problems.size() == before) {
                 newMembers.add(new NewMember(r.row(), email, first, last, phone, r.joinedOn(), roles));
             }
-            balances.add(new MemberBalance(email, null, savings, penalties));
+            balances.add(new MemberBalance(email, null, savings, penalties, otherSavings));
         }
     }
 

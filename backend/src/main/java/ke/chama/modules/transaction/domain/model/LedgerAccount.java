@@ -41,6 +41,23 @@ public record LedgerAccount(UUID id,
     /** An account a chama adds to its chart, e.g. "1030 Equity Bank savings account". */
     public static LedgerAccount custom(UUID chamaId, String code, String name, AccountType type, Currency currency,
                                        UUID createdBy, Instant now) {
+        return validated(chamaId, code, name, type, currency, false, createdBy, now);
+    }
+
+    /**
+     * An account that keeps a balance per member, e.g. "2010 Share capital" for a savings product.
+     * What the chama owes its members: a liability, or equity for share capital.
+     */
+    public static LedgerAccount memberLedger(UUID chamaId, String code, String name, AccountType type,
+                                             Currency currency, UUID createdBy, Instant now) {
+        if (type != AccountType.LIABILITY && type != AccountType.EQUITY) {
+            throw new InvalidAccountException("An account that keeps member balances must be a liability or equity account");
+        }
+        return validated(chamaId, code, name, type, currency, true, createdBy, now);
+    }
+
+    private static LedgerAccount validated(UUID chamaId, String code, String name, AccountType type, Currency currency,
+                                           boolean memberLedger, UUID createdBy, Instant now) {
         String normalizedCode = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
         if (!CODE.matcher(normalizedCode).matches()) {
             throw new InvalidAccountException("Account code must be 2 to 10 letters, digits or hyphens, e.g. 1030");
@@ -52,7 +69,7 @@ public record LedgerAccount(UUID id,
             throw new InvalidAccountException("Account type is required");
         }
         return new LedgerAccount(UUID.randomUUID(), chamaId, normalizedCode, name.trim(), type, null, currency,
-                false, true, createdBy, now);
+                memberLedger, true, createdBy, now);
     }
 
     static LedgerAccount system(UUID chamaId, String code, String name, AccountType type, LedgerAccountKey key,

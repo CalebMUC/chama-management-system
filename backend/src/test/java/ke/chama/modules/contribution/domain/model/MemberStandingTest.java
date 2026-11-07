@@ -75,6 +75,37 @@ class MemberStandingTest {
         assertThat(standing.periods()).isEmpty();
     }
 
+    @Test
+    void standingsPerProductAddUpPeriodByPeriod() {
+        LocalDate today = LocalDate.of(2026, 11, 20);
+        // Deposits: KES 5,000 a month, fully paid. Shares: KES 500 a month, only September paid.
+        MemberStanding deposits = MemberStanding.of(List.of(new Due(SEPTEMBER, KES_5000), new Due(OCTOBER, KES_5000)),
+                2 * KES_5000, today, 5);
+        MemberStanding shares = MemberStanding.of(List.of(new Due(SEPTEMBER, 50_000), new Due(OCTOBER, 50_000)),
+                50_000, today, 5);
+
+        MemberStanding all = MemberStanding.combine(List.of(deposits, shares));
+
+        assertThat(all.totalPaidMinor()).isEqualTo(2 * KES_5000 + 50_000);
+        assertThat(all.dueToDateMinor()).isEqualTo(2 * KES_5000 + 100_000);
+        assertThat(all.arrearsMinor()).isEqualTo(50_000);
+        assertThat(all.periods()).extracting(p -> p.period().key()).containsExactly("2026-09", "2026-10");
+        assertThat(all.periods()).extracting(MemberStanding.PeriodStanding::amountDueMinor)
+                .containsExactly(550_000L, 550_000L);
+        assertThat(all.periods()).extracting(MemberStanding.PeriodStanding::status)
+                .containsExactly(Status.PAID, Status.PARTIALLY_PAID);
+        assertThat(all.periods().get(1).late()).isTrue();
+        assertThat(all.latePeriods()).isEqualTo(1);
+    }
+
+    @Test
+    void oneProductCombinesToItself() {
+        MemberStanding only = MemberStanding.of(FOUR_MONTHS, 750_000, LocalDate.of(2026, 11, 20), 5);
+
+        assertThat(MemberStanding.combine(List.of(only))).isEqualTo(only);
+        assertThat(MemberStanding.combine(List.of()).arrearsMinor()).isZero();
+    }
+
     private static ContributionPeriod period(String key, LocalDate due) {
         return new ContributionPeriod(UUID.randomUUID(), CHAMA, key, Frequency.MONTHLY, due.withDayOfMonth(1),
                 due.withDayOfMonth(due.lengthOfMonth()), due, KES_5000, "KES", Instant.EPOCH);

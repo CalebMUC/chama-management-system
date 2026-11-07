@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** Row-level security limits every query to the current chama. Loans load with their guarantors and approvals. */
@@ -28,6 +29,9 @@ public interface LoanRepository {
     List<Loan> guaranteedBy(UUID chamaId, UUID guarantorUserId);
 
     boolean hasOpenLoan(UUID chamaId, UUID borrowerUserId);
+
+    /** Members with a loan in progress (pending, approved or active). */
+    Set<UUID> borrowersWithOpenLoans(UUID chamaId);
 
     void insertRepayment(LoanRepayment repayment);
 

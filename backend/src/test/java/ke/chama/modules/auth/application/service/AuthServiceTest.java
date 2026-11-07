@@ -74,7 +74,8 @@ class AuthServiceTest {
         AuthProperties properties = new AuthProperties("test", "x".repeat(32), Duration.ofMinutes(15), Duration.ofDays(7),
                 false,
                 new AuthProperties.Lockout(5, LOCKOUT),
-                new AuthProperties.Links("http://app", Duration.ofHours(24), Duration.ofMinutes(30), Duration.ofSeconds(60)));
+                new AuthProperties.Links("http://app", Duration.ofHours(24), Duration.ofMinutes(30), Duration.ofSeconds(60),
+                        Duration.ofDays(7)));
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
         service = new AuthService(users, mock(RoleRepository.class), refreshTokens, hasher,

@@ -160,6 +160,32 @@ public final class Investment {
                 List.of(), Status.PROPOSED, null, null, null, null, null, 0, 0, 0, 0, null, null, null, null, null, now, 0);
     }
 
+    /**
+     * An investment the chama already held in its earlier records: active, carried at
+     * {@code amountMinor}, optionally with what it is worth on {@code asOf}.
+     */
+    public static Investment imported(UUID chamaId, UUID importedBy, String name, Type type, String institution,
+                                      long amountMinor, String currency, Integer expectedReturnBasisPoints,
+                                      LocalDate investedOn, Long currentValueMinor, LocalDate asOf, Instant now) {
+        if (type == null) {
+            throw new InvalidInvestmentException("A type is required");
+        }
+        if (amountMinor <= 0) {
+            throw new InvalidInvestmentException("The amount invested must be greater than zero");
+        }
+        if (currentValueMinor != null && currentValueMinor < 0) {
+            throw new InvalidInvestmentException("The current value cannot be negative");
+        }
+        if (investedOn == null || investedOn.isAfter(asOf)) {
+            throw new InvalidInvestmentException("The investment date must be on or before the cut-over date");
+        }
+        return new Investment(UUID.randomUUID(), chamaId, text(name, MAX_NAME_LENGTH, "name"), type,
+                optional(institution, MAX_NAME_LENGTH, "institution"), "Brought forward from the chama's records",
+                amountMinor, currency, expectedReturnBasisPoints, null, importedBy, 1, List.of(), Status.ACTIVE, null,
+                null, null, null, investedOn, amountMinor, 0, 0, 0, currentValueMinor,
+                currentValueMinor == null ? null : asOf, null, null, null, now, 0);
+    }
+
     // ---- decisions ------------------------------------------------------------------------------
 
     public void approve(UUID approverUserId, String note, Instant now) {

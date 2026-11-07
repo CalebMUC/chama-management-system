@@ -96,6 +96,21 @@ public class Membership extends AggregateRoot {
         return membership;
     }
 
+    /**
+     * A member brought over from the chama's earlier records: active from the day they actually
+     * joined, with the roles they hold. MEMBER is always included.
+     */
+    public static Membership imported(UUID chamaId, UUID userId, String email, int memberNumber, Instant joinedAt,
+                                      Set<ChamaRole> roles, UUID importedBy, Instant now) {
+        Membership membership = new Membership(chamaId, userId, email, MembershipStatus.ACTIVE, joinedAt);
+        membership.memberNumber = memberNumber;
+        membership.joinedAt = joinedAt;
+        membership.decidedBy = importedBy;
+        membership.decidedAt = now;
+        membership.roles.addAll(roles);
+        return membership;
+    }
+
     /** Someone registered with the chama's code: they wait for an official's approval. */
     public static Membership application(UUID chamaId, UUID userId, String email, Instant now) {
         return new Membership(chamaId, userId, email, MembershipStatus.PENDING_APPROVAL, now);

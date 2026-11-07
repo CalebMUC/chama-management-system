@@ -18,9 +18,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** Plain JDBC, like the other money modules. Row-level security restricts every statement to the current chama. */
@@ -45,9 +47,11 @@ class JdbcLoanRepository implements LoanRepository {
         jdbc.update("""
                 insert into loan.loans (id, tenant_id, borrower_user_id, principal_minor, interest_bp, interest_minor,
                                         term_months, purpose, currency, applied_on, required_guarantors,
-                                        required_approvals, status, repaid_minor, created_at)
+                                        required_approvals, status, disbursed_on, disbursed_by, disbursement_method,
+                                        disbursement_reference, disbursement_entry_id, repaid_minor, created_at)
                 values (:id, :tenant, :borrower, :principal, :interestBp, :interest, :term, :purpose, :currency,
-                        :appliedOn, :requiredGuarantors, :requiredApprovals, :status, 0, :createdAt)""",
+                        :appliedOn, :requiredGuarantors, :requiredApprovals, :status, :disbursedOn, :disbursedBy,
+                        :method, :reference, :entry, :repaid, :createdAt)""",
                 new MapSqlParameterSource()
                         .addValue("id", l.id())
                         .addValue("tenant", l.chamaId())
@@ -62,6 +66,12 @@ class JdbcLoanRepository implements LoanRepository {
                         .addValue("requiredGuarantors", l.requiredGuarantors())
                         .addValue("requiredApprovals", l.requiredApprovals())
                         .addValue("status", l.status().name())
+                        .addValue("disbursedOn", l.disbursedOn() == null ? null : Date.valueOf(l.disbursedOn()))
+                        .addValue("disbursedBy", l.disbursedBy())
+                        .addValue("method", l.disbursementMethod())
+                        .addValue("reference", l.disbursementReference())
+                        .addValue("entry", l.disbursementEntryId())
+                        .addValue("repaid", l.repaidMinor())
                         .addValue("createdAt", Timestamp.from(l.createdAt())));
         saveChildren(l);
     }
@@ -173,6 +183,12 @@ class JdbcLoanRepository implements LoanRepository {
                         + " and borrower_user_id = :borrower and status in " + OPEN + ")",
                 Map.of("tenant", chamaId, "borrower", borrowerUserId), Boolean.class);
         return Boolean.TRUE.equals(exists);
+    }
+
+    @Override
+    public Set<UUID> borrowersWithOpenLoans(UUID chamaId) {
+        return new HashSet<>(jdbc.queryForList("select borrower_user_id from loan.loans where tenant_id = :tenant"
+                + " and status in " + OPEN, Map.of("tenant", chamaId), UUID.class));
     }
 
     @Override

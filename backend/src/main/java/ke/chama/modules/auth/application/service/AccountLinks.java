@@ -5,6 +5,7 @@ import java.net.URLEncoder;
 import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.modules.auth.application.AuthProperties;
 import ke.chama.modules.auth.application.port.out.OneTimeTokenRepository;
+import ke.chama.modules.auth.domain.event.AccountSetupRequested;
 import ke.chama.modules.auth.domain.event.EmailVerificationRequested;
 import ke.chama.modules.auth.domain.event.PasswordResetRequested;
 import ke.chama.modules.auth.domain.exception.InvalidLinkException;
@@ -53,6 +54,17 @@ class AccountLinks {
         String url = issue(user, TokenPurpose.PASSWORD_RESET, RESET_PASSWORD_PATH, ttl, now);
         events.publishEvent(new PasswordResetRequested(UUID.randomUUID(), now, user.getId(),
                 user.getEmail(), user.getFirstName(), url, now.plus(ttl)));
+    }
+
+    /**
+     * For an account someone else created (e.g. an imported member): a link to choose a password.
+     * It is a password-reset link with a longer life; using it also confirms the email address.
+     */
+    void sendAccountSetup(User user, String chamaName, Instant now) {
+        Duration ttl = config.accountSetupTtl();
+        String url = issue(user, TokenPurpose.PASSWORD_RESET, RESET_PASSWORD_PATH, ttl, now);
+        events.publishEvent(new AccountSetupRequested(UUID.randomUUID(), now, user.getId(), user.getEmail(),
+                user.getFirstName(), chamaName, TenantContext.code().orElse(null), url, now.plus(ttl)));
     }
 
     /** True if a link of this kind went out within the resend interval: don't flood the inbox. */

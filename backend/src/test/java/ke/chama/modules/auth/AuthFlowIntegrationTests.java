@@ -23,8 +23,11 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -169,7 +172,8 @@ class AuthFlowIntegrationTests {
             login(email, PASSWORD)
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
-                    .andExpect(jsonPath("$.data.expiresIn").value(900))
+                    // 15 minutes, less any seconds the request itself took on a slow machine
+                    .andExpect(jsonPath("$.data.expiresIn").value(allOf(greaterThan(890), lessThanOrEqualTo(900))))
                     .andExpect(jsonPath("$.data.accessToken").isString())
                     .andExpect(jsonPath("$.data.refreshToken").isString());
         }

@@ -21,14 +21,17 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "pm.test('Response uses the API envelope', () => {",
-          "  const j = pm.response.json();",
-          "  pm.expect(j).to.have.property('success');",
-          "  pm.expect(j).to.have.property('message');",
-          "});",
-          "pm.test(`success matches the HTTP status (${pm.response.code})`, () => {",
-          "  pm.expect(pm.response.json().success).to.eql(pm.response.code < 400);",
-          "});"
+          "// JSON responses only: the .xlsx template download is a file.",
+          "if ((pm.response.headers.get('Content-Type') || '').includes('json')) {",
+          "  pm.test('Response uses the API envelope', () => {",
+          "    const j = pm.response.json();",
+          "    pm.expect(j).to.have.property('success');",
+          "    pm.expect(j).to.have.property('message');",
+          "  });",
+          "  pm.test(`success matches the HTTP status (${pm.response.code})`, () => {",
+          "    pm.expect(pm.response.json().success).to.eql(pm.response.code < 400);",
+          "  });",
+          "}"
         ]
       }
     }
@@ -3019,6 +3022,127 @@
         }
       ],
       "description": "Needs the INVESTMENTS licence feature."
+    },
+    {
+      "name": "Imports",
+      "item": [
+        {
+          "name": "Download the template",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/imports/opening-balances/template",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "imports",
+                "opening-balances",
+                "template"
+              ]
+            },
+            "description": "Use Send and Download to save the .xlsx. Fill it in, then preview it."
+          }
+        },
+        {
+          "name": "Preview opening balances",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/imports/opening-balances/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "imports",
+                "opening-balances",
+                "preview"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "The filled-in .xlsx template"
+                },
+                {
+                  "key": "asOf",
+                  "value": "2026-10-31",
+                  "type": "text",
+                  "description": "The cut-over date"
+                }
+              ]
+            },
+            "description": "Checks every row; saves nothing. data.problems lists each problem with its sheet, row and column."
+          }
+        },
+        {
+          "name": "Import opening balances",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/imports/opening-balances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "imports",
+                "opening-balances"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "The filled-in .xlsx template"
+                },
+                {
+                  "key": "asOf",
+                  "value": "2026-10-31",
+                  "type": "text",
+                  "description": "The cut-over date"
+                }
+              ]
+            },
+            "description": "Once per chama, all or nothing. New members get a welcome email to set their password."
+          }
+        },
+        {
+          "name": "Import status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/imports/opening-balances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "imports",
+                "opening-balances"
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Bring the chama's records over from Excel. Chairperson by default (CHAMA_SETTINGS_MANAGE)."
     },
     {
       "name": "Ledger",

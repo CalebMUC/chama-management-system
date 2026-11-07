@@ -32,9 +32,18 @@ public final class ContributionViews {
                               Instant recordedAt,
                               UUID reversedBy,
                               Instant reversedAt,
-                              String reversalReason) {
+                              String reversalReason,
+                              List<AllocationView> allocations) {
     }
 
+    /** What part of a payment went into which savings product. */
+    public record AllocationView(UUID productId, String productCode, String productName, long amountMinor) {
+    }
+
+    /**
+     * @param amountDueMinor what each member owes for the period across every product
+     * @param products       what each product asks for it
+     */
     public record PeriodView(UUID id,
                              String key,
                              Frequency frequency,
@@ -42,7 +51,21 @@ public final class ContributionViews {
                              LocalDate endDate,
                              LocalDate dueDate,
                              long amountDueMinor,
-                             String currency) {
+                             String currency,
+                             List<PeriodProductView> products) {
+    }
+
+    public record PeriodProductView(UUID productId, String productCode, String productName, long amountMinor) {
+    }
+
+    /** A member's standing in one savings product. */
+    public record ProductStandingView(UUID productId,
+                                      String productCode,
+                                      String productName,
+                                      long totalPaidMinor,
+                                      long dueToDateMinor,
+                                      long arrearsMinor,
+                                      long advanceMinor) {
     }
 
     /**
@@ -71,6 +94,8 @@ public final class ContributionViews {
     }
 
     /**
+     * Totals across every savings product, with the breakdown per product.
+     *
      * @param balanceMinor paid minus due-to-date: negative means in arrears, positive is credit
      */
     public record StandingView(UUID memberUserId,
@@ -82,7 +107,8 @@ public final class ContributionViews {
                                long arrearsMinor,
                                long advanceMinor,
                                long balanceMinor,
-                               int latePeriods) {
+                               int latePeriods,
+                               List<ProductStandingView> products) {
     }
 
     public record MyPeriodView(PeriodView period, long amountDueMinor, long paidMinor,

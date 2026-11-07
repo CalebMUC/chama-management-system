@@ -28,7 +28,8 @@ public interface LoanRepository {
     /** Loans the member was asked to guarantee, newest first. */
     List<Loan> guaranteedBy(UUID chamaId, UUID guarantorUserId);
 
-    boolean hasOpenLoan(UUID chamaId, UUID borrowerUserId);
+    /** Whether the member has a loan in progress of this product. */
+    boolean hasOpenLoan(UUID chamaId, UUID borrowerUserId, UUID productId);
 
     /** Members with a loan in progress (pending, approved or active). */
     Set<UUID> borrowersWithOpenLoans(UUID chamaId);

@@ -15,8 +15,11 @@ import java.util.UUID;
  */
 public interface OpeningBalanceImports {
 
-    /** The .xlsx template to fill in. */
-    byte[] template();
+    /**
+     * The .xlsx template to fill in, with a savings column on the Members sheet for each of the
+     * chama's savings products besides the default.
+     */
+    byte[] template(UUID chamaId);
 
     /** Checks the file without saving anything. */
     PreviewView preview(UUID chamaId, byte[] file, LocalDate asOf);

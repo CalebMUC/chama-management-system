@@ -4,6 +4,8 @@ import ke.chama.modules.chama.domain.event.ChamaCreated;
 import ke.chama.modules.transaction.application.port.out.LedgerRepository;
 import ke.chama.modules.transaction.domain.model.DefaultChartOfAccounts;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +25,9 @@ class ChartOfAccountsSeeder {
         this.repository = repository;
     }
 
+    /** First of the ChamaCreated listeners: products and other set-up post to these accounts. */
     @EventListener
+    @Order(Ordered.HIGHEST_PRECEDENCE)
     @Transactional(propagation = Propagation.MANDATORY)
     void on(ChamaCreated event) {
         repository.insertAccounts(DefaultChartOfAccounts.forChama(event.chamaId(),

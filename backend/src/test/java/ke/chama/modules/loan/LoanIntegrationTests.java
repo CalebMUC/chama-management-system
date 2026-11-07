@@ -183,7 +183,7 @@ public class LoanIntegrationTests {
             apply(member, KES_10000, 6, "Fees", List.of()).andExpect(status().isCreated());
             apply(member, KES_10000, 6, "More fees", List.of())
                     .andExpect(status().isUnprocessableEntity())
-                    .andExpect(jsonPath("$.message").value(containsString("already have a loan in progress")));
+                    .andExpect(jsonPath("$.message").value(containsString("already have a normal loan in progress")));
         }
     }
 

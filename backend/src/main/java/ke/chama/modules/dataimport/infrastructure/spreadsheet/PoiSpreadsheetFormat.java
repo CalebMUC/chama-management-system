@@ -37,6 +37,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -87,7 +88,7 @@ class PoiSpreadsheetFormat implements SpreadsheetFormat {
     // ---- reading --------------------------------------------------------------------------------
 
     @Override
-    public OpeningBalanceSheets read(byte[] file, int fractionDigits) {
+    public OpeningBalanceSheets read(byte[] file, int fractionDigits, List<String> otherSavingsColumns) {
         if (file == null || file.length == 0) {
             throw new InvalidImportFileException("The file is empty");
         }
@@ -95,9 +96,19 @@ class PoiSpreadsheetFormat implements SpreadsheetFormat {
             List<Problem> problems = new ArrayList<>();
             Reader reader = new Reader(problems, fractionDigits);
             List<MemberRow> members = new ArrayList<>();
-            reader.rows(workbook, MEMBERS, MEMBER_COLUMNS, List.of(EMAIL), true, (r, row) -> members.add(new MemberRow(row,
-                    r.text(EMAIL), r.text(FIRST_NAME), r.text(LAST_NAME), r.phone(PHONE), r.date(JOINED_ON), r.list(ROLES),
-                    r.amount(SAVINGS), r.amount(PENALTIES))));
+            List<String> memberColumns = new ArrayList<>(MEMBER_COLUMNS);
+            memberColumns.addAll(otherSavingsColumns);
+            reader.rows(workbook, MEMBERS, memberColumns, List.of(EMAIL), true, (r, row) -> {
+                Map<String, Long> otherSavings = new LinkedHashMap<>();
+                for (String column : otherSavingsColumns) {
+                    Long amount = r.amount(column);
+                    if (amount != null) {
+                        otherSavings.put(column, amount);
+                    }
+                }
+                members.add(new MemberRow(row, r.text(EMAIL), r.text(FIRST_NAME), r.text(LAST_NAME), r.phone(PHONE),
+                        r.date(JOINED_ON), r.list(ROLES), r.amount(SAVINGS), r.amount(PENALTIES), otherSavings));
+            });
             List<LoanRow> loans = new ArrayList<>();
             reader.rows(workbook, LOANS, LOAN_COLUMNS, List.of(MEMBER_EMAIL), false, (r, row) -> loans.add(new LoanRow(row,
                     r.text(MEMBER_EMAIL), r.amount(PRINCIPAL), r.amount(INTEREST), r.integer(TERM), r.date(DISBURSED_ON),
@@ -341,17 +352,25 @@ class PoiSpreadsheetFormat implements SpreadsheetFormat {
     // ---- writing the template -------------------------------------------------------------------
 
     @Override
-    public byte[] template(Set<String> roleNames, Set<String> investmentTypes) {
+    public byte[] template(Set<String> roleNames, Set<String> investmentTypes, List<String> otherSavingsColumns) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Styles styles = new Styles(workbook);
             readMe(workbook, styles, roleNames, investmentTypes);
 
-            Sheet members = sheet(workbook, styles, MEMBERS, List.of(EMAIL + " *", FIRST_NAME + " *", LAST_NAME + " *",
-                    PHONE + " *", JOINED_ON + " *", ROLES, SAVINGS, PENALTIES), new int[]{30, 16, 16, 16, 14, 24, 16, 20});
+            List<String> memberHeadings = new ArrayList<>(List.of(EMAIL + " *", FIRST_NAME + " *", LAST_NAME + " *",
+                    PHONE + " *", JOINED_ON + " *", ROLES, SAVINGS, PENALTIES));
+            memberHeadings.addAll(otherSavingsColumns);
+            int[] widths = new int[memberHeadings.size()];
+            int[] fixed = {30, 16, 16, 16, 14, 24, 16, 20};
+            for (int i = 0; i < widths.length; i++) {
+                widths[i] = i < fixed.length ? fixed[i] : Math.max(18, memberHeadings.get(i).length() + 2);
+            }
+            Sheet members = sheet(workbook, styles, MEMBERS, memberHeadings, widths);
             members.setDefaultColumnStyle(3, styles.text);
             members.setDefaultColumnStyle(4, styles.date);
-            members.setDefaultColumnStyle(6, styles.amount);
-            members.setDefaultColumnStyle(7, styles.amount);
+            for (int i = 6; i < memberHeadings.size(); i++) {
+                members.setDefaultColumnStyle(i, styles.amount);
+            }
 
             Sheet loans = sheet(workbook, styles, LOANS, List.of(MEMBER_EMAIL + " *", PRINCIPAL + " *", INTEREST,
                     TERM + " *", DISBURSED_ON + " *", REPAID, PURPOSE), new int[]{30, 16, 16, 14, 14, 20, 30});
@@ -420,7 +439,9 @@ class PoiSpreadsheetFormat implements SpreadsheetFormat {
                 "",
                 "MEMBERS: one row per member, including officials already using the system (matched by email: their",
                 "savings and penalties are brought in, nothing else changes). Every new member gets an email with a",
-                "link to set their password. Savings = each member's total savings on the cut-over date.",
+                "link to set their password. Savings = each member's deposits on the cut-over date. If your chama",
+                "keeps other savings products (e.g. share capital or welfare), each has its own column after these:",
+                "put each member's balance in it. Add the products in the system before downloading this template.",
                 "Penalties owed = fines and penalties they still owe. Roles (optional, comma-separated): "
                         + String.join(", ", roleNames.stream().sorted().toList()) + ".",
                 "",

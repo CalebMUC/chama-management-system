@@ -3,6 +3,7 @@ package ke.chama.modules.contribution.infrastructure.persistence;
 import ke.chama.modules.contribution.application.port.out.ContributionRepository;
 import ke.chama.modules.contribution.domain.model.ContributionPayment;
 import ke.chama.modules.contribution.domain.model.ContributionPeriod;
+import ke.chama.modules.contribution.domain.model.PaymentAllocation.Allocation;
 import ke.chama.modules.contribution.domain.model.PaymentMethod;
 import ke.chama.modules.contribution.domain.model.PeriodSchedule.Frequency;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,7 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -65,8 +67,8 @@ class JdbcContributionRepository implements ContributionRepository {
     }
 
     @Override
-    public void insertPeriod(ContributionPeriod p) {
-        jdbc.update("""
+    public boolean insertPeriod(ContributionPeriod p, Map<UUID, Long> amountPerProduct) {
+        int inserted = jdbc.update("""
                 insert into contribution.periods (id, tenant_id, period_key, frequency, start_date, end_date, due_date,
                                                   amount_due_minor, currency, opened_at)
                 values (:id, :tenant, :key, :frequency, :start, :end, :due, :amount, :currency, :openedAt)
@@ -82,18 +84,45 @@ class JdbcContributionRepository implements ContributionRepository {
                         .addValue("amount", p.amountDueMinor())
                         .addValue("currency", p.currency())
                         .addValue("openedAt", Timestamp.from(p.openedAt())));
+        if (inserted == 0) {
+            return false;
+        }
+        MapSqlParameterSource[] rows = amountPerProduct.entrySet().stream()
+                .filter(e -> e.getValue() > 0)
+                .map(e -> new MapSqlParameterSource()
+                        .addValue("tenant", p.chamaId())
+                        .addValue("period", p.id())
+                        .addValue("product", e.getKey())
+                        .addValue("amount", e.getValue()))
+                .toArray(MapSqlParameterSource[]::new);
+        jdbc.batchUpdate("""
+                insert into contribution.period_products (tenant_id, period_id, product_id, amount_minor)
+                values (:tenant, :period, :product, :amount)""", rows);
+        return true;
+    }
+
+    @Override
+    public Map<UUID, Map<UUID, Long>> periodProducts(UUID chamaId) {
+        Map<UUID, Map<UUID, Long>> result = new HashMap<>();
+        jdbc.query("select period_id, product_id, amount_minor from contribution.period_products where tenant_id = :tenant",
+                Map.of("tenant", chamaId),
+                rs -> {
+                    result.computeIfAbsent(rs.getObject("period_id", UUID.class), k -> new HashMap<>())
+                            .put(rs.getObject("product_id", UUID.class), rs.getLong("amount_minor"));
+                });
+        return result;
     }
 
     @Override
     public List<DueRow> dues(UUID chamaId) {
-        return jdbc.query("select period_id, member_user_id, amount_minor from contribution.dues where tenant_id = :tenant",
-                Map.of("tenant", chamaId), DUE);
+        return jdbc.query("select period_id, member_user_id, product_id, amount_minor from contribution.dues "
+                + "where tenant_id = :tenant", Map.of("tenant", chamaId), DUE);
     }
 
     @Override
     public List<DueRow> duesOf(UUID chamaId, UUID memberUserId) {
         return jdbc.query("""
-                        select period_id, member_user_id, amount_minor from contribution.dues
+                        select period_id, member_user_id, product_id, amount_minor from contribution.dues
                          where tenant_id = :tenant and member_user_id = :member""",
                 Map.of("tenant", chamaId, "member", memberUserId), DUE);
     }
@@ -106,18 +135,49 @@ class JdbcContributionRepository implements ContributionRepository {
                 .addValue("tenant", chamaId)
                 .addValue("period", d.periodId())
                 .addValue("member", d.memberUserId())
+                .addValue("product", d.productId())
                 .addValue("amount", d.amountMinor())
                 .addValue("createdAt", now)).toArray(MapSqlParameterSource[]::new);
         jdbc.batchUpdate("""
-                insert into contribution.dues (id, tenant_id, period_id, member_user_id, amount_minor, created_at)
-                values (:id, :tenant, :period, :member, :amount, :createdAt)
-                on conflict (period_id, member_user_id) do nothing""", rows);
+                insert into contribution.dues (id, tenant_id, period_id, member_user_id, product_id, amount_minor,
+                                               created_at)
+                values (:id, :tenant, :period, :member, :product, :amount, :createdAt)
+                on conflict (period_id, member_user_id, product_id) do nothing""", rows);
     }
 
     // ---- payments -----------------------------------------------------------------------------
 
     @Override
-    public void insertPayment(ContributionPayment p) {
+    public void insertPayment(ContributionPayment p, List<Allocation> allocations) {
+        insertPayment(p);
+        MapSqlParameterSource[] rows = allocations.stream().map(a -> new MapSqlParameterSource()
+                .addValue("tenant", p.chamaId())
+                .addValue("payment", p.id())
+                .addValue("product", a.productId())
+                .addValue("amount", a.amountMinor())).toArray(MapSqlParameterSource[]::new);
+        jdbc.batchUpdate("""
+                insert into contribution.payment_allocations (tenant_id, payment_id, product_id, amount_minor)
+                values (:tenant, :payment, :product, :amount)""", rows);
+    }
+
+    @Override
+    public Map<UUID, List<Allocation>> allocations(UUID chamaId, Collection<UUID> paymentIds) {
+        Map<UUID, List<Allocation>> result = new HashMap<>();
+        if (paymentIds.isEmpty()) {
+            return result;
+        }
+        jdbc.query("""
+                        select payment_id, product_id, amount_minor from contribution.payment_allocations
+                         where tenant_id = :tenant and payment_id in (:ids)""",
+                Map.of("tenant", chamaId, "ids", paymentIds),
+                rs -> {
+                    result.computeIfAbsent(rs.getObject("payment_id", UUID.class), k -> new ArrayList<>())
+                            .add(new Allocation(rs.getObject("product_id", UUID.class), rs.getLong("amount_minor")));
+                });
+        return result;
+    }
+
+    private void insertPayment(ContributionPayment p) {
         jdbc.update("""
                 insert into contribution.payments (id, tenant_id, member_user_id, amount_minor, currency, method, reference,
                                                    paid_on, notes, status, ledger_entry_id, recorded_by, recorded_at)
@@ -203,25 +263,36 @@ class JdbcContributionRepository implements ContributionRepository {
     }
 
     @Override
-    public Map<UUID, Long> paidTotals(UUID chamaId) {
-        Map<UUID, Long> totals = new HashMap<>();
+    public Map<UUID, Map<UUID, Long>> paidTotals(UUID chamaId) {
+        Map<UUID, Map<UUID, Long>> totals = new HashMap<>();
         jdbc.query("""
-                        select member_user_id, sum(amount_minor) as paid from contribution.payments
-                         where tenant_id = :tenant and status = 'RECORDED' group by member_user_id""",
+                        select p.member_user_id, a.product_id, sum(a.amount_minor) as paid
+                          from contribution.payments p
+                          join contribution.payment_allocations a on a.payment_id = p.id
+                         where p.tenant_id = :tenant and p.status = 'RECORDED'
+                         group by p.member_user_id, a.product_id""",
                 Map.of("tenant", chamaId),
                 rs -> {
-                    totals.put(rs.getObject("member_user_id", UUID.class), rs.getLong("paid"));
+                    totals.computeIfAbsent(rs.getObject("member_user_id", UUID.class), k -> new HashMap<>())
+                            .put(rs.getObject("product_id", UUID.class), rs.getLong("paid"));
                 });
         return totals;
     }
 
     @Override
-    public long paidTotal(UUID chamaId, UUID memberUserId) {
-        Long paid = jdbc.queryForObject("""
-                        select coalesce(sum(amount_minor), 0) from contribution.payments
-                         where tenant_id = :tenant and member_user_id = :member and status = 'RECORDED'""",
-                Map.of("tenant", chamaId, "member", memberUserId), Long.class);
-        return paid == null ? 0 : paid;
+    public Map<UUID, Long> paidTotals(UUID chamaId, UUID memberUserId) {
+        Map<UUID, Long> totals = new HashMap<>();
+        jdbc.query("""
+                        select a.product_id, sum(a.amount_minor) as paid
+                          from contribution.payments p
+                          join contribution.payment_allocations a on a.payment_id = p.id
+                         where p.tenant_id = :tenant and p.member_user_id = :member and p.status = 'RECORDED'
+                         group by a.product_id""",
+                Map.of("tenant", chamaId, "member", memberUserId),
+                rs -> {
+                    totals.put(rs.getObject("product_id", UUID.class), rs.getLong("paid"));
+                });
+        return totals;
     }
 
     @Override
@@ -247,6 +318,7 @@ class JdbcContributionRepository implements ContributionRepository {
     private static final RowMapper<DueRow> DUE = (rs, i) -> new DueRow(
             rs.getObject("period_id", UUID.class),
             rs.getObject("member_user_id", UUID.class),
+            rs.getObject("product_id", UUID.class),
             rs.getLong("amount_minor"));
 
     private static final RowMapper<ContributionPayment> PAYMENT = (rs, i) -> new ContributionPayment(

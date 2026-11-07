@@ -42,8 +42,8 @@ import java.util.UUID;
 /**
  * Loans of the caller's chama. Needs the LOANS licence feature.
  * <pre>
- * GET  /api/v1/loans/eligibility        LOAN_APPLY             what I may borrow now
- * POST /api/v1/loans                    LOAN_APPLY             {principalMinor, termMonths, purpose, guarantorUserIds}
+ * GET  /api/v1/loans/eligibility        LOAN_APPLY             ?productId= what I may borrow now
+ * POST /api/v1/loans                    LOAN_APPLY             {productId, principalMinor, termMonths, purpose, guarantorUserIds}
  * GET  /api/v1/loans/me                 active member          my loans, with schedules
  * GET  /api/v1/loans/guarantees         active member          loans I was asked to guarantee
  * POST /api/v1/loans/{id}/guarantee     active member          {accept} - the guarantor's answer
@@ -74,15 +74,19 @@ class LoanController {
     // ---- members --------------------------------------------------------------------------------
 
     @Operation(summary = "What I may borrow now",
-            description = "The limit (a multiple of my savings), interest, guarantor rules, and any reasons I cannot borrow yet.")
+            description = """
+                    Under one loan product (the default product without productId): the limit (a multiple of my \
+                    savings in the products that back loans, less what my loans of other products use), interest, \
+                    longest term, guarantor rules, and any reasons I cannot borrow yet.""")
     @GetMapping("/eligibility")
     @RequiresChamaPermission(ChamaPermission.LOAN_APPLY)
-    ApiResponse<EligibilityView> eligibility() {
-        return ApiResponse.ok(loans.eligibility(chama(), CurrentUser.id()));
+    ApiResponse<EligibilityView> eligibility(@RequestParam(required = false) UUID productId) {
+        return ApiResponse.ok(loans.eligibility(chama(), CurrentUser.id(), productId));
     }
 
     @Operation(summary = "Apply for a loan",
-            description = "Loans above the guarantor threshold must name guarantors, who are asked by email. "
+            description = "Under a loan product (the default product without productId); one loan in progress per product. "
+                    + "Loans above the product's guarantor threshold must name guarantors, who are asked by email. "
                     + "Then a quorum of officials must approve.")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

@@ -261,6 +261,22 @@ class JdbcLedgerRepository implements LedgerRepository {
     }
 
     @Override
+    public Map<UUID, Totals> memberTotals(UUID chamaId, UUID accountId) {
+        Map<UUID, Totals> result = new HashMap<>();
+        jdbc.query("""
+                        select member_user_id, sum(debit_minor) as debits, sum(credit_minor) as credits
+                          from ledger.journal_lines
+                         where tenant_id = :tenant and account_id = :account and member_user_id is not null
+                         group by member_user_id""",
+                Map.of("tenant", chamaId, "account", accountId),
+                rs -> {
+                    result.put(rs.getObject("member_user_id", UUID.class),
+                            new Totals(rs.getLong("debits"), rs.getLong("credits")));
+                });
+        return result;
+    }
+
+    @Override
     public List<StatementRow> statement(UUID chamaId, UUID accountId, UUID memberUserId, LocalDate from, LocalDate to) {
         StringBuilder sql = new StringBuilder("""
                 select e.id, e.entry_number, e.entry_date, e.description, e.reference, e.source_type,

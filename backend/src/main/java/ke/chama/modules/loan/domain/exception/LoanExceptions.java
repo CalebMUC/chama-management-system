@@ -97,4 +97,35 @@ public final class LoanExceptions {
                     "A loan transaction with reference " + reference + " has already been recorded");
         }
     }
+
+    public static class InvalidLoanProductException extends DomainException {
+        public InvalidLoanProductException(String message) {
+            super("LOAN_PRODUCT_INVALID", ErrorType.VALIDATION, message);
+        }
+    }
+
+    public static class LoanProductNotFoundException extends DomainException {
+        public LoanProductNotFoundException() {
+            super("LOAN_PRODUCT_NOT_FOUND", ErrorType.NOT_FOUND, "Loan product not found");
+        }
+    }
+
+    public static class DuplicateLoanProductCodeException extends DomainException {
+        public DuplicateLoanProductCodeException(String code) {
+            super("LOAN_PRODUCT_CODE_TAKEN", ErrorType.CONFLICT, "A loan product with code " + code + " already exists");
+        }
+    }
+
+    /** The default loan product's terms are the chama's loan settings, and it is always offered. */
+    public static class DefaultLoanProductRuleException extends DomainException {
+        public DefaultLoanProductRuleException(String message) {
+            super("LOAN_PRODUCT_DEFAULT_RULE", ErrorType.BUSINESS_RULE, message);
+        }
+    }
+
+    public static class LoanProductInactiveException extends DomainException {
+        public LoanProductInactiveException(String name) {
+            super("LOAN_PRODUCT_INACTIVE", ErrorType.BUSINESS_RULE, name + " is no longer offered");
+        }
+    }
 }

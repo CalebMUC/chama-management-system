@@ -66,6 +66,8 @@ public final class Loan {
     private final UUID id;
     private final UUID chamaId;
     private final UUID borrowerUserId;
+    /** The loan product applied for; its terms were copied onto the loan at that moment. */
+    private final UUID productId;
     private final long principalMinor;
     private final int interestBasisPoints;
     private final long interestMinor;
@@ -91,7 +93,7 @@ public final class Loan {
     private final Instant createdAt;
     private final long version;
 
-    public Loan(UUID id, UUID chamaId, UUID borrowerUserId, long principalMinor, int interestBasisPoints,
+    public Loan(UUID id, UUID chamaId, UUID borrowerUserId, UUID productId, long principalMinor, int interestBasisPoints,
                 long interestMinor, int termMonths, String purpose, String currency, LocalDate appliedOn,
                 int requiredGuarantors, int requiredApprovals, List<Guarantor> guarantors, List<Approval> approvals,
                 Status status, UUID rejectedBy, Instant rejectedAt, String rejectionReason, Instant cancelledAt,
@@ -100,6 +102,7 @@ public final class Loan {
         this.id = Objects.requireNonNull(id);
         this.chamaId = Objects.requireNonNull(chamaId);
         this.borrowerUserId = Objects.requireNonNull(borrowerUserId);
+        this.productId = Objects.requireNonNull(productId);
         this.principalMinor = principalMinor;
         this.interestBasisPoints = interestBasisPoints;
         this.interestMinor = interestMinor;
@@ -133,7 +136,7 @@ public final class Loan {
      * @param requiredGuarantors how many guarantors must accept (0 when the loan is small enough)
      * @param requiredApprovals  the chama's approval quorum when the member applied
      */
-    public static Loan apply(UUID chamaId, UUID borrowerUserId, long principalMinor, int termMonths, String purpose,
+    public static Loan apply(UUID chamaId, UUID borrowerUserId, UUID productId, long principalMinor, int termMonths, String purpose,
                              String currency, int interestBasisPoints, int requiredGuarantors, int requiredApprovals,
                              List<UUID> guarantorUserIds, LocalDate today, Instant now) {
         if (principalMinor <= 0) {
@@ -163,7 +166,7 @@ public final class Loan {
         long interest = BigDecimal.valueOf(principalMinor).multiply(BigDecimal.valueOf(interestBasisPoints))
                 .divide(BigDecimal.valueOf(10_000), 0, RoundingMode.HALF_UP).longValueExact();
         List<Guarantor> guarantors = named.stream().map(g -> Guarantor.requested(g, now)).toList();
-        return new Loan(UUID.randomUUID(), chamaId, borrowerUserId, principalMinor, interestBasisPoints, interest,
+        return new Loan(UUID.randomUUID(), chamaId, borrowerUserId, productId, principalMinor, interestBasisPoints, interest,
                 termMonths, why, currency, today, requiredGuarantors, Math.max(requiredApprovals, 1), guarantors,
                 List.of(), requiredGuarantors > 0 ? Status.PENDING_GUARANTORS : Status.PENDING_APPROVAL, null, null,
                 null, null, null, null, null, null, null, 0, now, 0);
@@ -174,7 +177,7 @@ public final class Loan {
      * Its repayment schedule continues from {@code disbursedOn}; the opening-balance entry is its
      * disbursement entry.
      */
-    public static Loan imported(UUID chamaId, UUID borrowerUserId, long principalMinor, long interestMinor,
+    public static Loan imported(UUID chamaId, UUID borrowerUserId, UUID productId, long principalMinor, long interestMinor,
                                 int termMonths, LocalDate disbursedOn, long repaidMinor, String purpose, String currency,
                                 UUID importedBy, UUID openingEntryId, Instant now) {
         if (principalMinor <= 0 || interestMinor < 0) {
@@ -192,7 +195,7 @@ public final class Loan {
         }
         int interestBp = BigDecimal.valueOf(interestMinor).multiply(BigDecimal.valueOf(10_000))
                 .divide(BigDecimal.valueOf(principalMinor), 0, RoundingMode.HALF_UP).intValueExact();
-        return new Loan(UUID.randomUUID(), chamaId, borrowerUserId, principalMinor, interestBp, interestMinor, termMonths,
+        return new Loan(UUID.randomUUID(), chamaId, borrowerUserId, productId, principalMinor, interestBp, interestMinor, termMonths,
                 why, currency, disbursedOn, 0, 1, List.of(), List.of(), Status.ACTIVE, null, null, null, null, disbursedOn,
                 importedBy, null, null, Objects.requireNonNull(openingEntryId), repaidMinor, now, 0);
     }
@@ -434,6 +437,7 @@ public final class Loan {
     public UUID id() { return id; }
     public UUID chamaId() { return chamaId; }
     public UUID borrowerUserId() { return borrowerUserId; }
+    public UUID productId() { return productId; }
     public long principalMinor() { return principalMinor; }
     public int interestBasisPoints() { return interestBasisPoints; }
     public long interestMinor() { return interestMinor; }

@@ -187,7 +187,10 @@ items = [
             "reference": "QK{{$timestamp}}", "paidOn": None,
             "notes": "November contribution"},
             tests=save("paymentId", "j.data.id"),
-            desc="Methods CASH, BANK, MPESA; MPESA and BANK need a reference. paidOn defaults to today."),
+            desc="Methods CASH, BANK, MPESA; MPESA and BANK need a reference. paidOn defaults to today. "
+                 "Split across the member's savings products automatically (oldest dues first, by product "
+                 "priority; the rest to Deposits), or say how with \"allocations\": "
+                 "[{\"productId\": \"{{savingsProductId}}\", \"amountMinor\": 500000}] adding up to the amount."),
         req("List payments", "GET", "/api/v1/contributions",
             query=[q("memberUserId", "{{memberUserId}}"), q("from", "2026-01-01"), q("to", "2026-12-31"),
                    q("status", "RECORDED")] + PAGE),
@@ -198,6 +201,47 @@ items = [
         req("Who paid for a period", "GET", "/api/v1/contributions/periods/{{periodId}}"),
         req("Standings", "GET", "/api/v1/contributions/standings", query=[q("inArrears", "true")]),
         req("My contributions", "GET", "/api/v1/contributions/me", auth="member"),
+    ], desc="Needs the CONTRIBUTIONS licence feature."),
+
+    folder("Savings products", [
+        req("List savings products", "GET", "/api/v1/savings-products", auth="member",
+            tests=save("savingsProductId", "j.data[0].id")),
+        req("One savings product", "GET", "/api/v1/savings-products/{{savingsProductId}}", auth="member"),
+        req("Add a savings product", "POST", "/api/v1/savings-products", {
+            "code": "SHR", "name": "Share capital", "kind": "SHARE_CAPITAL", "contributionMinor": 50000,
+            "allocationPriority": 10, "mandatory": True, "countsTowardLoanLimit": None, "refundableOnExit": None,
+            "earnsDividend": None, "ledgerAccountCode": None},
+            tests=save("savingsProductId", "j.data.id"),
+            desc="Kinds DEPOSITS, SHARE_CAPITAL, WELFARE, CUSTOM; null flags take the kind's defaults. Gets its own "
+                 "member-ledger account (2010, 2020, ... or 3100 for share capital). A mandatory product opens an "
+                 "account for every member. PRODUCTS_MANAGE."),
+        req("Change a savings product", "PUT", "/api/v1/savings-products/{{savingsProductId}}", {
+            "name": "Share capital", "contributionMinor": 100000, "allocationPriority": 10, "mandatory": True},
+            desc="For periods opened from now on. The default product's contribution is the chama's contribution "
+                 "amount (change it in the settings)."),
+        req("Deactivate a savings product", "POST", "/api/v1/savings-products/{{savingsProductId}}/deactivate"),
+        req("Activate a savings product", "POST", "/api/v1/savings-products/{{savingsProductId}}/activate"),
+    ], desc="Needs the CONTRIBUTIONS licence feature."),
+
+    folder("Member accounts", [
+        req("List member accounts", "GET", "/api/v1/member-accounts",
+            query=[q("memberUserId", "{{memberUserId}}"), q("productId", "{{savingsProductId}}"), q("status", "ACTIVE")],
+            tests=save("memberAccountId", "j.data[0].id"), desc="MEMBER_ACCOUNTS_VIEW_ALL. With balances."),
+        req("One member account", "GET", "/api/v1/member-accounts/{{memberAccountId}}"),
+        req("Account statement", "GET", "/api/v1/member-accounts/{{memberAccountId}}/statement",
+            query=[q("from", "2026-01-01"), q("to", "2026-12-31")]),
+        req("My accounts", "GET", "/api/v1/member-accounts/me", auth="member",
+            tests=save("memberAccountId", "j.data.accounts[0].id")),
+        req("My account statement", "GET", "/api/v1/member-accounts/me/{{memberAccountId}}/statement", auth="member",
+            query=[q("from", "2026-01-01"), q("to", "2026-12-31")]),
+        req("Open an account", "POST", "/api/v1/member-accounts",
+            {"memberUserId": "{{memberUserId}}", "productId": "{{savingsProductId}}"},
+            tests=save("memberAccountId", "j.data.id"),
+            desc="For optional products; mandatory ones open by themselves. MEMBER_ACCOUNTS_MANAGE."),
+        req("Close an account", "POST", "/api/v1/member-accounts/{{memberAccountId}}/close",
+            {"reason": "Member stopped saving for holidays"},
+            desc="Zero balance only; never a mandatory product's account while the member is in the chama."),
+        req("Reopen an account", "POST", "/api/v1/member-accounts/{{memberAccountId}}/reopen"),
     ], desc="Needs the CONTRIBUTIONS licence feature."),
 
     folder("Penalties", [
@@ -216,13 +260,34 @@ items = [
         req("My penalties", "GET", "/api/v1/penalties/me", auth="member"),
     ], desc="Needs the PENALTIES licence feature."),
 
+    folder("Loan products", [
+        req("List loan products", "GET", "/api/v1/loan-products", auth="member",
+            tests=save("loanProductId", "j.data[0].id")),
+        req("One loan product", "GET", "/api/v1/loan-products/{{loanProductId}}", auth="member"),
+        req("Add a loan product", "POST", "/api/v1/loan-products", {
+            "code": "EMERG", "name": "Emergency loan", "interestBasisPoints": 500, "maxTermMonths": 3,
+            "maxMultiplier": 1, "minMembershipMonths": 0, "guarantorThresholdMinor": 0, "guarantorsRequired": 0},
+            tests=save("loanProductId", "j.data.id"), desc="PRODUCTS_MANAGE."),
+        req("Change a loan product", "PUT", "/api/v1/loan-products/{{loanProductId}}", {
+            "name": "Emergency loan", "interestBasisPoints": 600, "maxTermMonths": 6, "maxMultiplier": 1,
+            "minMembershipMonths": 0, "guarantorThresholdMinor": 0, "guarantorsRequired": 0},
+            desc="For new applications. The default product's terms are the chama's loan settings: only its name changes here."),
+        req("Deactivate a loan product", "POST", "/api/v1/loan-products/{{loanProductId}}/deactivate"),
+        req("Activate a loan product", "POST", "/api/v1/loan-products/{{loanProductId}}/activate"),
+    ], desc="Needs the LOANS licence feature."),
+
     folder("Loans", [
         req("My eligibility", "GET", "/api/v1/loans/eligibility", auth="member",
-            desc="The limit (multiple of savings), interest, guarantor rules and any reasons the member cannot borrow."),
+            query=[q("productId", "{{loanProductId}}")],
+            desc="Under one loan product (the default without productId): the limit (multiple of loan-backing "
+                 "savings, less other loans), interest, longest term, guarantor rules and any reasons the member "
+                 "cannot borrow."),
         req("Apply for a loan", "POST", "/api/v1/loans",
-            {"principalMinor": 1000000, "termMonths": 6, "purpose": "School fees", "guarantorUserIds": []},
+            {"productId": None, "principalMinor": 1000000, "termMonths": 6, "purpose": "School fees",
+             "guarantorUserIds": []},
             auth="member", tests=save("loanId", "j.data.loan.id"),
-            desc="Above the guarantor threshold (default KES 50,000) name guarantors, e.g. [\"{{guarantorUserId}}\", ...]."),
+            desc="productId null means the default product; one loan in progress per product. Above the product's "
+                 "guarantor threshold (default KES 50,000) name guarantors, e.g. [\"{{guarantorUserId}}\", ...]."),
         req("My loans", "GET", "/api/v1/loans/me", auth="member"),
         req("Loans I was asked to guarantee", "GET", "/api/v1/loans/guarantees", auth="member"),
         req("Answer a guarantee request", "POST", "/api/v1/loans/{{loanId}}/guarantee", {"accept": True}, auth="member",
@@ -358,6 +423,7 @@ VARIABLES = [
     ("memberToken", ""), ("memberRefreshToken", ""),
     ("chamaId", ""), ("membershipId", ""), ("memberUserId", ""), ("guarantorUserId", ""),
     ("paymentId", ""), ("periodId", ""), ("penaltyId", ""), ("loanId", ""), ("expenseId", ""), ("investmentId", ""), ("accountId", ""), ("entryId", ""),
+    ("savingsProductId", ""), ("memberAccountId", ""), ("loanProductId", ""),
 ]
 
 collection = {

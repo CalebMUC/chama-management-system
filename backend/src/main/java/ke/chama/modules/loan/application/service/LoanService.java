@@ -15,6 +15,8 @@ import ke.chama.modules.loan.domain.exception.LoanExceptions.LoanNotFoundExcepti
 import ke.chama.modules.loan.domain.exception.LoanExceptions.NotASeatedMemberException;
 import ke.chama.modules.loan.domain.model.Loan;
 import ke.chama.modules.loan.domain.model.LoanEligibility;
+import ke.chama.modules.loan.domain.model.LoanProduct;
+import ke.chama.modules.account.api.MemberAccounts;
 import ke.chama.modules.loan.domain.model.LoanRepayment;
 import ke.chama.modules.member.api.MemberDirectory;
 import ke.chama.modules.member.api.MemberSummary;
@@ -61,7 +63,9 @@ public class LoanService implements LoanUseCases {
     static final String AUDIT_TARGET = "LOAN";
 
     private final LoanRepository repository;
+    private final LoanProductService products;
     private final MemberDirectory members;
+    private final MemberAccounts memberAccounts;
     private final ChamaDirectory chamas;
     private final Ledger ledger;
     private final AuditTrail auditTrail;
@@ -69,11 +73,14 @@ public class LoanService implements LoanUseCases {
     private final Clock clock;
     private final ZoneId zone;
 
-    public LoanService(LoanRepository repository, MemberDirectory members, ChamaDirectory chamas, Ledger ledger,
+    public LoanService(LoanRepository repository, LoanProductService products, MemberDirectory members,
+                       MemberAccounts memberAccounts, ChamaDirectory chamas, Ledger ledger,
                        AuditTrail auditTrail, ApplicationEventPublisher events, Clock clock,
                        @Value("${chama.time-zone:Africa/Nairobi}") String timeZone) {
         this.repository = repository;
+        this.products = products;
         this.members = members;
+        this.memberAccounts = memberAccounts;
         this.chamas = chamas;
         this.ledger = ledger;
         this.auditTrail = auditTrail;
@@ -86,19 +93,22 @@ public class LoanService implements LoanUseCases {
 
     @Override
     @Transactional(readOnly = true)
-    public EligibilityView eligibility(UUID chamaId, UUID memberUserId) {
-        LoanRules rules = rules(chamaId);
-        LoanEligibility e = assess(chamaId, memberUserId, rules);
-        return new EligibilityView(e.eligible(), e.reasons(), rules.currency(), e.savingsMinor(), e.maxLoanMinor(),
-                rules.maxMultiplier(), rules.interestBasisPoints(), Loan.MAX_TERM_MONTHS, e.membershipMonths(),
-                rules.minMembershipMonths(), rules.guarantorThresholdMinor(), rules.guarantorsRequired(),
-                rules.approvalQuorum());
+    public EligibilityView eligibility(UUID chamaId, UUID memberUserId, UUID productId) {
+        LoanProduct product = products.forApplication(chamaId, productId);
+        LoanRules rules = rules(chamaId, product);
+        LoanEligibility e = assess(chamaId, memberUserId, product, rules);
+        return new EligibilityView(e.eligible(), e.reasons(), product.id(), product.code(), product.name(),
+                rules.currency(), e.savingsMinor(), e.otherLoansMinor(), e.maxLoanMinor(), rules.maxMultiplier(),
+                rules.interestBasisPoints(), product.maxTermMonths(), e.membershipMonths(), rules.minMembershipMonths(),
+                rules.guarantorThresholdMinor(), rules.guarantorsRequired(), rules.approvalQuorum());
     }
 
     @Override
     public LoanDetailView apply(UUID chamaId, UUID borrowerUserId, Application application) {
-        LoanRules rules = rules(chamaId);
-        assess(chamaId, borrowerUserId, rules).requireAllows(application.principalMinor());
+        LoanProduct product = products.forApplication(chamaId, application.productId());
+        LoanRules rules = rules(chamaId, product);
+        assess(chamaId, borrowerUserId, product, rules).requireAllows(application.principalMinor(),
+                application.termMonths());
         List<UUID> guarantorIds = application.guarantorUserIds() == null ? List.of() : application.guarantorUserIds();
         List<MemberSummary> guarantors = new ArrayList<>();
         for (UUID id : guarantorIds) {
@@ -106,12 +116,13 @@ public class LoanService implements LoanUseCases {
                 guarantors.add(activeMember(chamaId, id, "A guarantor you named"));
             }
         }
-        Loan loan = Loan.apply(chamaId, borrowerUserId, application.principalMinor(), application.termMonths(),
+        Loan loan = Loan.apply(chamaId, borrowerUserId, product.id(), application.principalMinor(), application.termMonths(),
                 application.purpose(), rules.currency(), rules.interestBasisPoints(),
                 rules.guarantorsFor(application.principalMinor()), rules.approvalQuorum(), guarantorIds, today(),
                 clock.instant());
         repository.insert(loan);
-        audit(loan, borrowerUserId, "LOAN_APPLIED", Map.of("principalMinor", loan.principalMinor(),
+        audit(loan, borrowerUserId, "LOAN_APPLIED", Map.of("productCode", product.code(),
+                "principalMinor", loan.principalMinor(),
                 "termMonths", loan.termMonths(), "interestMinor", loan.interestMinor(), "purpose", loan.purpose(),
                 "guarantors", guarantorIds.stream().map(UUID::toString).toList()));
         guarantors.forEach(g -> askToGuarantee(loan, g));
@@ -247,17 +258,19 @@ public class LoanService implements LoanUseCases {
     @Transactional(readOnly = true)
     public Page<LoanView> loans(UUID chamaId, UUID borrowerUserId, Loan.Status status, Pageable pageable) {
         Map<UUID, MemberSummary> seated = seatedById(chamaId);
+        Map<UUID, LoanProduct> catalog = products.byId(chamaId);
         LocalDate today = today();
-        return repository.loans(chamaId, borrowerUserId, status, pageable).map(l -> view(l, seated, today));
+        return repository.loans(chamaId, borrowerUserId, status, pageable).map(l -> view(l, seated, catalog, today));
     }
 
     @Override
     @Transactional(readOnly = true)
     public MyLoansView mine(UUID chamaId, UUID memberUserId) {
         Map<UUID, MemberSummary> seated = seatedById(chamaId);
+        Map<UUID, LoanProduct> catalog = products.byId(chamaId);
         LocalDate today = today();
         List<Loan> loans = repository.loansOf(chamaId, memberUserId);
-        List<LoanDetailView> details = loans.stream().map(l -> detail(l, seated, today)).toList();
+        List<LoanDetailView> details = loans.stream().map(l -> detail(l, seated, catalog, today)).toList();
         return new MyLoansView(rules(chamaId).currency(),
                 loans.stream().mapToLong(Loan::outstandingMinor).sum(),
                 loans.stream().mapToLong(l -> l.arrearsMinor(today)).sum(), details);
@@ -267,21 +280,31 @@ public class LoanService implements LoanUseCases {
     @Transactional(readOnly = true)
     public List<GuaranteeView> guaranteeRequests(UUID chamaId, UUID memberUserId) {
         Map<UUID, MemberSummary> seated = seatedById(chamaId);
+        Map<UUID, LoanProduct> catalog = products.byId(chamaId);
         LocalDate today = today();
         return repository.guaranteedBy(chamaId, memberUserId).stream()
-                .map(l -> new GuaranteeView(view(l, seated, today),
+                .map(l -> new GuaranteeView(view(l, seated, catalog, today),
                         l.guarantor(memberUserId).map(Loan.Guarantor::status).orElse(null)))
                 .toList();
     }
 
     // ---- helpers --------------------------------------------------------------------------------
 
-    private LoanEligibility assess(UUID chamaId, UUID memberUserId, LoanRules rules) {
+    /**
+     * Savings are the member's balances in the products that count toward the loan limit; loans of
+     * other products in progress use up part of the limit (what is still owed once disbursed, the
+     * principal applied for before that).
+     */
+    private LoanEligibility assess(UUID chamaId, UUID memberUserId, LoanProduct product, LoanRules rules) {
         MemberSummary member = members.seatedMember(chamaId, memberUserId).orElse(null);
-        long savings = ledger.memberBalance(chamaId, memberUserId, LedgerAccountKey.MEMBER_SAVINGS).minorUnits();
+        long savings = memberAccounts.loanBackingSavingsMinor(chamaId, memberUserId);
+        long otherLoans = repository.loansOf(chamaId, memberUserId).stream()
+                .filter(l -> l.status().open() && !l.productId().equals(product.id()))
+                .mapToLong(l -> l.status() == Loan.Status.ACTIVE ? l.outstandingMinor() : l.principalMinor())
+                .sum();
         LocalDate joinedOn = member == null || member.joinedAt() == null ? null : LocalDate.ofInstant(member.joinedAt(), zone);
-        return LoanEligibility.assess(rules, member != null && member.active(), savings, joinedOn, today(),
-                repository.hasOpenLoan(chamaId, memberUserId));
+        return LoanEligibility.assess(rules, product.name(), product.maxTermMonths(), member != null && member.active(),
+                savings, otherLoans, joinedOn, today(), repository.hasOpenLoan(chamaId, memberUserId, product.id()));
     }
 
     private MemberSummary activeMember(UUID chamaId, UUID userId, String who) {
@@ -335,6 +358,12 @@ public class LoanService implements LoanUseCases {
         return chamas.loanRules(chamaId).orElseThrow();
     }
 
+    /** The product's terms with the chama's currency and approval quorum. */
+    private LoanRules rules(UUID chamaId, LoanProduct product) {
+        LoanRules chama = rules(chamaId);
+        return product.rules(chama.currency(), chama.approvalQuorum());
+    }
+
     private String chamaName(UUID chamaId) {
         return chamas.find(chamaId).map(ChamaSummary::name).orElse("your chama");
     }
@@ -370,10 +399,11 @@ public class LoanService implements LoanUseCases {
     // ---- views ----------------------------------------------------------------------------------
 
     private LoanDetailView detail(Loan loan) {
-        return detail(loan, seatedById(loan.chamaId()), today());
+        return detail(loan, seatedById(loan.chamaId()), products.byId(loan.chamaId()), today());
     }
 
-    private LoanDetailView detail(Loan loan, Map<UUID, MemberSummary> seated, LocalDate today) {
+    private LoanDetailView detail(Loan loan, Map<UUID, MemberSummary> seated, Map<UUID, LoanProduct> catalog,
+                                  LocalDate today) {
         List<GuarantorView> guarantors = loan.guarantors().stream().map(g -> {
             MemberSummary m = seated.get(g.userId());
             return new GuarantorView(g.userId(), name(m), m == null ? null : m.memberNumber(), g.status(),
@@ -394,14 +424,17 @@ public class LoanService implements LoanUseCases {
                 .map(r -> new RepaymentView(r.id(), r.amountMinor(), r.method(), r.reference(), r.paidOn(),
                         r.ledgerEntryId(), r.recordedBy(), r.recordedAt()))
                 .toList();
-        return new LoanDetailView(view(loan, seated, today), guarantors, approvals, disbursement, decision, schedule,
+        return new LoanDetailView(view(loan, seated, catalog, today), guarantors, approvals, disbursement, decision, schedule,
                 repayments);
     }
 
-    private static LoanView view(Loan l, Map<UUID, MemberSummary> seated, LocalDate today) {
+    private static LoanView view(Loan l, Map<UUID, MemberSummary> seated, Map<UUID, LoanProduct> catalog,
+                                 LocalDate today) {
         MemberSummary borrower = seated.get(l.borrowerUserId());
+        LoanProduct product = catalog.get(l.productId());
         Loan.Instalment next = l.status() == Loan.Status.ACTIVE ? l.nextInstalment(today).orElse(null) : null;
         return new LoanView(l.id(), l.borrowerUserId(), name(borrower), borrower == null ? null : borrower.memberNumber(),
+                l.productId(), product == null ? null : product.code(), product == null ? null : product.name(),
                 l.principalMinor(), l.interestBasisPoints(), l.interestMinor(), l.totalDueMinor(), l.repaidMinor(),
                 l.outstandingMinor(), l.arrearsMinor(today), l.currency(), l.termMonths(), l.purpose(), l.status(),
                 l.appliedOn(), l.requiredGuarantors(), l.acceptedGuarantors(), l.requiredApprovals(),

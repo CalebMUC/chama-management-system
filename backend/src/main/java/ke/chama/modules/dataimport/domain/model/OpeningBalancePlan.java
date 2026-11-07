@@ -2,6 +2,7 @@ package ke.chama.modules.dataimport.domain.model;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -32,8 +33,26 @@ public record OpeningBalancePlan(LocalDate asOf,
                             Set<String> roles) {
     }
 
-    /** @param existingUserId set for someone already a member; null for a new member (matched by email) */
-    public record MemberBalance(String email, UUID existingUserId, long savingsMinor, long penaltiesMinor) {
+    /**
+     * @param existingUserId    set for someone already a member; null for a new member (matched by email)
+     * @param savingsMinor      in the default savings product (the "Savings" column)
+     * @param otherSavingsMinor in other savings products, by column heading as written in the template
+     */
+    public record MemberBalance(String email, UUID existingUserId, long savingsMinor, long penaltiesMinor,
+                                Map<String, Long> otherSavingsMinor) {
+
+        public MemberBalance {
+            otherSavingsMinor = otherSavingsMinor == null ? Map.of() : Map.copyOf(otherSavingsMinor);
+        }
+
+        public MemberBalance(String email, UUID existingUserId, long savingsMinor, long penaltiesMinor) {
+            this(email, existingUserId, savingsMinor, penaltiesMinor, Map.of());
+        }
+
+        /** Savings across every product. */
+        public long totalSavingsMinor() {
+            return savingsMinor + otherSavingsMinor.values().stream().mapToLong(Long::longValue).sum();
+        }
     }
 
     public record PlannedLoan(String memberEmail, long principalMinor, long interestMinor, int termMonths,
@@ -52,8 +71,9 @@ public record OpeningBalancePlan(LocalDate asOf,
         return problems.stream().noneMatch(Problem::blocking);
     }
 
+    /** Savings across every product: what the chama owes its members. */
     public long savingsMinor() {
-        return balances.stream().mapToLong(MemberBalance::savingsMinor).sum();
+        return balances.stream().mapToLong(MemberBalance::totalSavingsMinor).sum();
     }
 
     public long penaltiesMinor() {

@@ -19,11 +19,13 @@ import java.util.UUID;
 class LoanImportService implements LoanImport {
 
     private final LoanRepository repository;
+    private final LoanProductService products;
     private final AuditTrail auditTrail;
     private final Clock clock;
 
-    LoanImportService(LoanRepository repository, AuditTrail auditTrail, Clock clock) {
+    LoanImportService(LoanRepository repository, LoanProductService products, AuditTrail auditTrail, Clock clock) {
         this.repository = repository;
+        this.products = products;
         this.auditTrail = auditTrail;
         this.clock = clock;
     }
@@ -37,7 +39,8 @@ class LoanImportService implements LoanImport {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID importLoan(UUID chamaId, ImportedLoan l, UUID importedBy, UUID openingEntryId) {
-        Loan loan = Loan.imported(chamaId, l.borrowerUserId(), l.principalMinor(), l.interestMinor(), l.termMonths(),
+        // Brought-over loans are recorded under the default product ("Normal loan").
+        Loan loan = Loan.imported(chamaId, l.borrowerUserId(), products.defaultProduct(chamaId).id(), l.principalMinor(), l.interestMinor(), l.termMonths(),
                 l.disbursedOn(), l.repaidMinor(), l.purpose(), l.currency(), importedBy, openingEntryId, clock.instant());
         repository.insert(loan);
         auditTrail.record(AuditEntry.of(chamaId, importedBy, "LOAN_IMPORTED", LoanService.AUDIT_TARGET, loan.id())

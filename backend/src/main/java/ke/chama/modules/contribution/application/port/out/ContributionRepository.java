@@ -2,6 +2,7 @@ package ke.chama.modules.contribution.application.port.out;
 
 import ke.chama.modules.contribution.domain.model.ContributionPayment;
 import ke.chama.modules.contribution.domain.model.ContributionPeriod;
+import ke.chama.modules.contribution.domain.model.PaymentAllocation.Allocation;
 import ke.chama.modules.contribution.domain.model.PaymentMethod;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,27 +27,37 @@ public interface ContributionRepository {
 
     Optional<ContributionPeriod> period(UUID chamaId, UUID periodId);
 
-    /** Ignored if a period with the same key exists (two requests opening it at once). */
-    void insertPeriod(ContributionPeriod period);
+    /**
+     * Opens a period with what each savings product asks for it. Ignored (false) if a period with
+     * the same key exists (two requests opening it at once).
+     */
+    boolean insertPeriod(ContributionPeriod period, Map<UUID, Long> amountPerProduct);
 
-    record DueRow(UUID periodId, UUID memberUserId, long amountMinor) {
+    /** What each product asked for in each period: period id to (product id to amount). */
+    Map<UUID, Map<UUID, Long>> periodProducts(UUID chamaId);
+
+    record DueRow(UUID periodId, UUID memberUserId, UUID productId, long amountMinor) {
     }
 
     List<DueRow> dues(UUID chamaId);
 
     List<DueRow> duesOf(UUID chamaId, UUID memberUserId);
 
-    /** Existing (periodId, memberUserId) pairs are skipped. */
+    /** Existing (period, member, product) dues are skipped. */
     void insertDues(UUID chamaId, Collection<DueRow> dues);
 
     // ---- payments -----------------------------------------------------------------------------
 
-    void insertPayment(ContributionPayment payment);
+    /** The payment and how it was split across products. */
+    void insertPayment(ContributionPayment payment, List<Allocation> allocations);
 
     /** Saves the reversal; false if the payment changed since it was read (optimistic lock). */
     boolean updateReversal(ContributionPayment payment);
 
     Optional<ContributionPayment> payment(UUID chamaId, UUID paymentId);
+
+    /** How each payment was split, by payment id. */
+    Map<UUID, List<Allocation>> allocations(UUID chamaId, Collection<UUID> paymentIds);
 
     boolean recordedReferenceExists(UUID chamaId, PaymentMethod method, String reference);
 
@@ -54,10 +65,11 @@ public interface ContributionRepository {
     Page<ContributionPayment> payments(UUID chamaId, UUID memberUserId, LocalDate from, LocalDate to,
                                        ContributionPayment.Status status, Pageable pageable);
 
-    /** Sum of recorded (not reversed) payments per member. */
-    Map<UUID, Long> paidTotals(UUID chamaId);
+    /** Recorded (not reversed) payments per member and product: member id to (product id to total). */
+    Map<UUID, Map<UUID, Long>> paidTotals(UUID chamaId);
 
-    long paidTotal(UUID chamaId, UUID memberUserId);
+    /** One member's recorded payments per product. */
+    Map<UUID, Long> paidTotals(UUID chamaId, UUID memberUserId);
 
     Set<UUID> membersWithPayments(UUID chamaId);
 }

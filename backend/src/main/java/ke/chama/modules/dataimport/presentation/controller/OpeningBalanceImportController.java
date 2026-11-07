@@ -52,7 +52,8 @@ class OpeningBalanceImportController {
     }
 
     @Operation(summary = "Download the template",
-            description = "An .xlsx workbook with instructions and the Members, Loans, Accounts and Investments sheets.")
+            description = "An .xlsx workbook with instructions and the Members, Loans, Accounts and Investments sheets. "
+                    + "Members has a savings column per savings product (add products before downloading).")
     @GetMapping("/template")
     @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
     ResponseEntity<byte[]> template() {
@@ -60,7 +61,7 @@ class OpeningBalanceImportController {
                 .contentType(XLSX)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.attachment().filename("opening-balances-template.xlsx").build().toString())
-                .body(imports.template());
+                .body(imports.template(TenantContext.requireChama()));
     }
 
     @Operation(summary = "Preview an import",

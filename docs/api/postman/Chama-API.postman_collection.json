@@ -166,6 +166,21 @@
       "key": "entryId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "savingsProductId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "memberAccountId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "loanProductId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -1319,7 +1334,7 @@
                 }
               }
             },
-            "description": "Methods CASH, BANK, MPESA; MPESA and BANK need a reference. paidOn defaults to today."
+            "description": "Methods CASH, BANK, MPESA; MPESA and BANK need a reference. paidOn defaults to today. Split across the member's savings products automatically (oldest dues first, by product priority; the rest to Deposits), or say how with \"allocations\": [{\"productId\": \"{{savingsProductId}}\", \"amountMinor\": 500000}] adding up to the amount."
           },
           "event": [
             {
@@ -1545,6 +1560,504 @@
                   "value": "{{memberToken}}",
                   "type": "string"
                 }
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Needs the CONTRIBUTIONS licence feature."
+    },
+    {
+      "name": "Savings products",
+      "item": [
+        {
+          "name": "List savings products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/savings-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "savings-products"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('savingsProductId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "One savings product",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/savings-products/{{savingsProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "savings-products",
+                "{{savingsProductId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add a savings product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/savings-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "savings-products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SHR\",\n  \"name\": \"Share capital\",\n  \"kind\": \"SHARE_CAPITAL\",\n  \"contributionMinor\": 50000,\n  \"allocationPriority\": 10,\n  \"mandatory\": true,\n  \"countsTowardLoanLimit\": null,\n  \"refundableOnExit\": null,\n  \"earnsDividend\": null,\n  \"ledgerAccountCode\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Kinds DEPOSITS, SHARE_CAPITAL, WELFARE, CUSTOM; null flags take the kind's defaults. Gets its own member-ledger account (2010, 2020, ... or 3100 for share capital). A mandatory product opens an account for every member. PRODUCTS_MANAGE."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('savingsProductId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change a savings product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/savings-products/{{savingsProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "savings-products",
+                "{{savingsProductId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Share capital\",\n  \"contributionMinor\": 100000,\n  \"allocationPriority\": 10,\n  \"mandatory\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "For periods opened from now on. The default product's contribution is the chama's contribution amount (change it in the settings)."
+          }
+        },
+        {
+          "name": "Deactivate a savings product",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/savings-products/{{savingsProductId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "savings-products",
+                "{{savingsProductId}}",
+                "deactivate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activate a savings product",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/savings-products/{{savingsProductId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "savings-products",
+                "{{savingsProductId}}",
+                "activate"
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Needs the CONTRIBUTIONS licence feature."
+    },
+    {
+      "name": "Member accounts",
+      "item": [
+        {
+          "name": "List member accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-accounts?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-accounts"
+              ],
+              "query": [
+                {
+                  "key": "memberUserId",
+                  "value": "{{memberUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "productId",
+                  "value": "{{savingsProductId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "MEMBER_ACCOUNTS_VIEW_ALL. With balances."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('memberAccountId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "One member account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-accounts/{{memberAccountId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-accounts",
+                "{{memberAccountId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Account statement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-accounts/{{memberAccountId}}/statement?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-accounts",
+                "{{memberAccountId}}",
+                "statement"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "My accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-accounts",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.accounts[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('memberAccountId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My account statement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-accounts/me/{{memberAccountId}}/statement?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-accounts",
+                "me",
+                "{{memberAccountId}}",
+                "statement"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Open an account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberUserId\": \"{{memberUserId}}\",\n  \"productId\": \"{{savingsProductId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "For optional products; mandatory ones open by themselves. MEMBER_ACCOUNTS_MANAGE."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('memberAccountId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Close an account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-accounts/{{memberAccountId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-accounts",
+                "{{memberAccountId}}",
+                "close"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Member stopped saving for holidays\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Zero balance only; never a mandatory product's account while the member is in the chama."
+          }
+        },
+        {
+          "name": "Reopen an account",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-accounts/{{memberAccountId}}/reopen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-accounts",
+                "{{memberAccountId}}",
+                "reopen"
               ]
             }
           }
@@ -1798,6 +2311,206 @@
       "description": "Needs the PENALTIES licence feature."
     },
     {
+      "name": "Loan products",
+      "item": [
+        {
+          "name": "List loan products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loan-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loan-products"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('loanProductId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "One loan product",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loan-products/{{loanProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loan-products",
+                "{{loanProductId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add a loan product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loan-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loan-products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"EMERG\",\n  \"name\": \"Emergency loan\",\n  \"interestBasisPoints\": 500,\n  \"maxTermMonths\": 3,\n  \"maxMultiplier\": 1,\n  \"minMembershipMonths\": 0,\n  \"guarantorThresholdMinor\": 0,\n  \"guarantorsRequired\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PRODUCTS_MANAGE."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('loanProductId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change a loan product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loan-products/{{loanProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loan-products",
+                "{{loanProductId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Emergency loan\",\n  \"interestBasisPoints\": 600,\n  \"maxTermMonths\": 6,\n  \"maxMultiplier\": 1,\n  \"minMembershipMonths\": 0,\n  \"guarantorThresholdMinor\": 0,\n  \"guarantorsRequired\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "For new applications. The default product's terms are the chama's loan settings: only its name changes here."
+          }
+        },
+        {
+          "name": "Deactivate a loan product",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loan-products/{{loanProductId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loan-products",
+                "{{loanProductId}}",
+                "deactivate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activate a loan product",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loan-products/{{loanProductId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loan-products",
+                "{{loanProductId}}",
+                "activate"
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Needs the LOANS licence feature."
+    },
+    {
       "name": "Loans",
       "item": [
         {
@@ -1806,7 +2519,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/loans/eligibility",
+              "raw": "{{baseUrl}}/api/v1/loans/eligibility?",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1815,6 +2528,13 @@
                 "v1",
                 "loans",
                 "eligibility"
+              ],
+              "query": [
+                {
+                  "key": "productId",
+                  "value": "{{loanProductId}}",
+                  "disabled": true
+                }
               ]
             },
             "auth": {
@@ -1827,7 +2547,7 @@
                 }
               ]
             },
-            "description": "The limit (multiple of savings), interest, guarantor rules and any reasons the member cannot borrow."
+            "description": "Under one loan product (the default without productId): the limit (multiple of loan-backing savings, less other loans), interest, longest term, guarantor rules and any reasons the member cannot borrow."
           }
         },
         {
@@ -1853,7 +2573,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"principalMinor\": 1000000,\n  \"termMonths\": 6,\n  \"purpose\": \"School fees\",\n  \"guarantorUserIds\": []\n}",
+              "raw": "{\n  \"productId\": null,\n  \"principalMinor\": 1000000,\n  \"termMonths\": 6,\n  \"purpose\": \"School fees\",\n  \"guarantorUserIds\": []\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1870,7 +2590,7 @@
                 }
               ]
             },
-            "description": "Above the guarantor threshold (default KES 50,000) name guarantors, e.g. [\"{{guarantorUserId}}\", ...]."
+            "description": "productId null means the default product; one loan in progress per product. Above the product's guarantor threshold (default KES 50,000) name guarantors, e.g. [\"{{guarantorUserId}}\", ...]."
           },
           "event": [
             {

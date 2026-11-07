@@ -52,5 +52,12 @@ public enum ChamaPermission {
     /** Add accounts to the chart of accounts and deactivate them. */
     LEDGER_ACCOUNTS_MANAGE,
     REPORT_VIEW_ALL,
-    AUDIT_LOG_VIEW
+    AUDIT_LOG_VIEW,
+
+    /** Add savings and loan products, change their terms, and switch them on or off. */
+    PRODUCTS_MANAGE,
+    /** See every member's accounts, balances and statements. */
+    MEMBER_ACCOUNTS_VIEW_ALL,
+    /** Open, close and reopen members' accounts in savings products. */
+    MEMBER_ACCOUNTS_MANAGE
 }

@@ -49,6 +49,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Currency;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -135,12 +136,70 @@ public class LedgerService implements Ledger, LedgerUseCases {
 
     @Override
     @Transactional(readOnly = true)
+    public Money memberBalance(UUID chamaId, UUID memberUserId, String accountCode) {
+        LedgerAccount account = memberLedgerAccount(chamaId, accountCode);
+        Totals totals = repository.accountTotals(chamaId, account.id(), memberUserId, null);
+        return Money.of(account.balance(totals.debits(), totals.credits()), account.currency());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> memberBalances(UUID chamaId, String accountCode) {
+        LedgerAccount account = memberLedgerAccount(chamaId, accountCode);
+        Map<UUID, Long> balances = new HashMap<>();
+        repository.memberTotals(chamaId, account.id())
+                .forEach((member, t) -> balances.put(member, account.balance(t.debits(), t.credits())));
+        return balances;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MemberStatement memberStatement(UUID chamaId, String accountCode, UUID memberUserId, LocalDate from,
+                                           LocalDate to) {
+        LedgerAccount account = memberLedgerAccount(chamaId, accountCode);
+        StatementView view = statement(chamaId, account.id(), memberUserId, from, to);
+        List<MemberStatement.Line> lines = view.lines().stream()
+                .map(l -> new MemberStatement.Line(l.entryId(), l.entryNumber(), l.entryDate(), l.description(),
+                        l.reference(), l.sourceType(), l.debitMinor(), l.creditMinor(), l.balanceMinor(), l.memo()))
+                .toList();
+        return new MemberStatement(account.code(), account.name(), account.currency().getCurrencyCode(), memberUserId,
+                from, to, view.openingBalanceMinor(), view.closingBalanceMinor(), lines);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<LedgerAccountSummary> account(UUID chamaId, String code) {
         if (code == null || code.isBlank()) {
             return Optional.empty();
         }
-        return repository.accountByCode(chamaId, code.trim().toUpperCase(Locale.ROOT))
-                .map(a -> new LedgerAccountSummary(a.code(), a.name(), a.type().name(), a.active()));
+        return repository.accountByCode(chamaId, code.trim().toUpperCase(Locale.ROOT)).map(LedgerService::summary);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<LedgerAccountSummary> account(UUID chamaId, LedgerAccountKey key) {
+        return repository.accountByKey(chamaId, key).map(LedgerService::summary);
+    }
+
+    @Override
+    public LedgerAccountSummary openMemberLedgerAccount(UUID chamaId, String code, String name, String type,
+                                                        UUID actorUserId) {
+        AccountType accountType;
+        try {
+            accountType = AccountType.valueOf(type);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new InvalidAccountException("Unknown account type " + type);
+        }
+        LedgerAccount account = LedgerAccount.memberLedger(chamaId, code, name, accountType, chamaCurrency(chamaId),
+                actorUserId, clock.instant());
+        if (repository.accountByCode(chamaId, account.code()).isPresent()) {
+            throw new DuplicateAccountCodeException(account.code());
+        }
+        repository.insertAccounts(List.of(account));
+        auditTrail.record(AuditEntry.of(chamaId, actorUserId, "LEDGER_ACCOUNT_CREATED", "LEDGER_ACCOUNT", account.id())
+                .with(Map.of("code", account.code(), "name", account.name(), "type", account.type().name(),
+                        "memberLedger", true)));
+        return summary(account);
     }
 
     // ---- Use cases (for the API) -------------------------------------------------------------
@@ -173,6 +232,10 @@ public class LedgerService implements Ledger, LedgerUseCases {
                 .orElseThrow(() -> new AccountNotFoundException(accountId.toString()));
         if (!active && account.systemKey() != null) {
             throw new InvalidAccountException("Account " + account.code() + " is used by the system and cannot be deactivated");
+        }
+        if (!active && account.memberLedger()) {
+            throw new InvalidAccountException("Account " + account.code()
+                    + " keeps member balances and cannot be deactivated; deactivate its savings product instead");
         }
         if (account.active() != active) {
             repository.setAccountActive(chamaId, accountId, active);
@@ -336,6 +399,20 @@ public class LedgerService implements Ledger, LedgerUseCases {
 
     private LedgerAccount accountByKey(UUID chamaId, LedgerAccountKey key) {
         return repository.accountByKey(chamaId, key).orElseThrow(() -> new AccountNotFoundException(key.name()));
+    }
+
+    private LedgerAccount memberLedgerAccount(UUID chamaId, String accountCode) {
+        String code = accountCode == null ? "" : accountCode.trim().toUpperCase(Locale.ROOT);
+        LedgerAccount account = repository.accountByCode(chamaId, code)
+                .orElseThrow(() -> new AccountNotFoundException(code));
+        if (!account.memberLedger()) {
+            throw new MemberRequiredException("Account " + account.code() + " does not keep balances per member");
+        }
+        return account;
+    }
+
+    private static LedgerAccountSummary summary(LedgerAccount a) {
+        return new LedgerAccountSummary(a.code(), a.name(), a.type().name(), a.active(), a.memberLedger());
     }
 
     /** Every account of a chama is kept in the chama's currency. */

@@ -3,8 +3,11 @@ package ke.chama.modules.contribution.domain.model;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Where one member stands: their payments applied to their dues, oldest due first. Nothing is
@@ -82,5 +85,42 @@ public record MemberStanding(long totalPaidMinor,
         }
         long advance = Math.max(totalPaidMinor - allDues, 0);
         return new MemberStanding(totalPaidMinor, dueToDate, arrears, advance, late, List.copyOf(periods));
+    }
+
+    /**
+     * One member's overall standing from their standing in each savings product: totals add up,
+     * and each period's due and paid amounts add up across products. A period is late if any
+     * product's due for it is late.
+     */
+    public static MemberStanding combine(List<MemberStanding> perProduct) {
+        Objects.requireNonNull(perProduct, "perProduct");
+        if (perProduct.size() == 1) {
+            return perProduct.getFirst();
+        }
+        long paid = 0;
+        long dueToDate = 0;
+        long arrears = 0;
+        long advance = 0;
+        Map<UUID, PeriodStanding> byPeriod = new LinkedHashMap<>();
+        for (MemberStanding s : perProduct) {
+            paid += s.totalPaidMinor();
+            dueToDate += s.dueToDateMinor();
+            arrears += s.arrearsMinor();
+            advance += s.advanceMinor();
+            for (PeriodStanding ps : s.periods()) {
+                byPeriod.merge(ps.period().id(), ps, (a, b) -> {
+                    long due = a.amountDueMinor() + b.amountDueMinor();
+                    long paidForPeriod = a.paidMinor() + b.paidMinor();
+                    Status status = paidForPeriod == due ? Status.PAID : paidForPeriod > 0 ? Status.PARTIALLY_PAID : Status.UNPAID;
+                    return new PeriodStanding(a.period(), due, paidForPeriod, status, a.due() || b.due(), a.late() || b.late());
+                });
+            }
+        }
+        List<PeriodStanding> periods = byPeriod.values().stream()
+                .sorted(Comparator.comparing((PeriodStanding ps) -> ps.period().dueDate())
+                        .thenComparing(ps -> ps.period().startDate()))
+                .toList();
+        int late = (int) periods.stream().filter(PeriodStanding::late).count();
+        return new MemberStanding(paid, dueToDate, arrears, advance, late, periods);
     }
 }

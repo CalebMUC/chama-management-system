@@ -2,6 +2,9 @@ package ke.chama.modules.transaction.api;
 
 import ke.chama.shared.domain.Money;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +30,39 @@ public interface Ledger {
     /** One member's balance on a member-ledger account, e.g. their savings. */
     Money memberBalance(UUID chamaId, UUID memberUserId, LedgerAccountKey account);
 
+    /** One member's balance on the member-ledger account with this code, e.g. a savings product's account. */
+    Money memberBalance(UUID chamaId, UUID memberUserId, String accountCode);
+
+    /** Every member's balance on the member-ledger account with this code; members without lines are absent. */
+    Map<UUID, Long> memberBalances(UUID chamaId, String accountCode);
+
+    /**
+     * One member's lines on a member-ledger account, oldest first, with a running balance.
+     * {@code from} and {@code to} are optional and inclusive.
+     */
+    MemberStatement memberStatement(UUID chamaId, String accountCode, UUID memberUserId, LocalDate from, LocalDate to);
+
     /** The account with this code in the chama's chart, if any. */
     Optional<LedgerAccountSummary> account(UUID chamaId, String code);
+
+    /** The system account with this key, e.g. the code of "Member savings". */
+    Optional<LedgerAccountSummary> account(UUID chamaId, LedgerAccountKey key);
+
+    /**
+     * Adds an account that keeps a balance per member (every line names a member), e.g. "2010
+     * Share capital" for a new savings product. Member-ledger accounts cannot be deactivated.
+     *
+     * @param type LIABILITY or EQUITY
+     */
+    LedgerAccountSummary openMemberLedgerAccount(UUID chamaId, String code, String name, String type, UUID actorUserId);
+
+    /** @param openingBalanceMinor the balance before {@code from} (zero without {@code from}) */
+    record MemberStatement(String accountCode, String accountName, String currency, UUID memberUserId,
+                           LocalDate from, LocalDate to, long openingBalanceMinor, long closingBalanceMinor,
+                           List<Line> lines) {
+
+        public record Line(UUID entryId, long entryNumber, LocalDate entryDate, String description, String reference,
+                           String sourceType, long debitMinor, long creditMinor, long balanceMinor, String memo) {
+        }
+    }
 }

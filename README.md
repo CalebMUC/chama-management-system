@@ -2,23 +2,24 @@
 
 # Chama Management System
 
-**A production-grade backend platform for managing Kenyan investment groups (Chamas)**
+**A multi-tenant platform for running Kenyan investment groups (Chamas): contributions, loans, penalties, expenses, investments and double-entry books**
 
 [![Java](https://img.shields.io/badge/Java-25-ED8B00?style=flat&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/25/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?style=flat&logo=spring-boot)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F?style=flat&logo=spring-boot)](https://spring.io/projects/spring-boot)
+[![Spring Modulith](https://img.shields.io/badge/Spring_Modulith-2.1-6DB33F?style=flat&logo=spring)](https://spring.io/projects/spring-modulith)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-316192?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.13-FF6600?style=flat&logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?style=flat&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CI](https://github.com/CalebMUC/chama-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/CalebMUC/chama-management-system/actions/workflows/ci.yml)
+[![Backend CI/CD](https://github.com/CalebMUC/chama-management-system/actions/workflows/backend-ci-cd.yml/badge.svg)](https://github.com/CalebMUC/chama-management-system/actions/workflows/backend-ci-cd.yml)
 
 [Business Context](#-business-context) •
-[Architecture](#-architecture) •
-[Services](#-microservices) •
+[Features](#-features) •
+[Architecture](#%EF%B8%8F-architecture) •
 [Quick Start](#-quick-start) •
-[API Reference](#-api-reference) •
-[Roadmap](#-roadmap)
+[API](#-api) •
+[Security](#-security-model) •
+[Testing](#-testing) •
+[Roadmap](#%EF%B8%8F-roadmap)
 
 </div>
 
@@ -26,138 +27,172 @@
 
 ## 📋 Business Context
 
-> **Chama** *(noun, Swahili)* — A community savings and investment group, common across Kenya and East Africa. Members pool money monthly, rotate lump-sum payouts, collectively invest, and offer each other loans backed by group savings.
+> **Chama** *(noun, Swahili)*: a community savings and investment group, common across Kenya and East Africa. Members pool money every month, lend to each other from the pooled savings, and invest together.
 
-There are an estimated **300,000+ registered Chamas in Kenya**, managing over **KES 500 billion** in assets. Most are still run on WhatsApp messages and paper ledgers, creating serious risks: missing records, disputes over balances, and no audit trail for regulatory compliance.
+There are an estimated **300,000+ registered Chamas in Kenya**, managing over **KES 500 billion** in assets. Most are still run on WhatsApp messages and paper ledgers, which leads to missing records, disputes over balances, and no audit trail.
 
-**This system solves that.**
+**This system replaces the notebook.** One deployment hosts many chamas. Each chama is an isolated tenant with its own members, rules, books and licence.
 
-### What a Chama Does (and What This System Manages)
-Member joins Chama
+### What a chama does, and what the system records
+
+```
+Member registers with the chama code ──► an official approves them (member number assigned)
 │
 ▼
-Pays monthly contribution (e.g. KES 5,000/month)
+Pays the contribution every period (e.g. KES 5,000/month), recorded with its M-Pesa code
 │
-├──► Savings balance grows
+├──► Split across savings products (Deposits, Share capital, Welfare, …) and posted to the ledger
 │
-├──► Eligible for loans (up to 3× savings balance)
-│ │
-│ ├──► Loan approved by committee
-│ ├──► Disbursed via M-Pesa
-│ └──► Repaid with interest → grows Chama fund
+├──► Late payments are penalised automatically (nightly)
 │
-├──► Late contributions trigger automatic penalties
+├──► Member borrows up to a multiple of their savings
+│     ├──► guarantors accept, a quorum of officials approves
+│     ├──► treasurer disburses, a monthly repayment schedule starts
+│     └──► repayments with flat interest grow the chama's income
 │
-└──► Group invests surplus in Money Market Funds
+├──► Officials record expenses; other officials approve them before they are paid
 │
-└──► Monthly returns distributed proportionally
+└──► Surplus is invested (MMF, T-bills, land, …): approved, funded, income and valuations tracked
+```
 
-### Core Business Rules
+### Core business rules (per-chama defaults, all configurable)
 
-| Rule | Detail |
-|------|--------|
-| **Loan eligibility** | Member must have ≥ 3 months contributions. Loan max = 3× personal savings balance |
-| **Loan approval** | Requires committee quorum (configurable, default: 2 of 3 officers) |
-| **Late contribution penalty** | 2% of monthly contribution amount per month late |
-| **Loan interest** | 10% flat rate per agreed term (common Chama standard) |
-| **Profit distribution** | Investment returns split proportionally to each member's savings balance at month-end |
-| **Guarantors** | Loans above KES 50,000 require 2 guarantors from active members |
+| Rule | Default |
+|------|---------|
+| **Contribution** | KES 5,000 per month, due on the 5th |
+| **Late penalty** | 2% of the contribution per late period, after 5 grace days |
+| **Loan limit** | 3× the member's loan-backing savings, after 3 months of membership |
+| **Loan interest** | 10% flat for the agreed term, repaid in equal monthly instalments (max 36 months) |
+| **Guarantors** | Loans above KES 50,000 need 2 guarantors from active members |
+| **Approval quorum** | 2 distinct officials approve every loan, expense and investment |
+| **Separation of duties** | Nobody records, approves or collects on their own money; whoever records an expense or proposes an investment cannot approve it |
+
+Loan products (e.g. an emergency loan with its own terms) and savings products can be added per chama.
+
+---
+
+## ✨ Features
+
+| Area | What is built |
+|------|---------------|
+| **Platform administration** | Onboard chamas with a unique login code, first administrator and licence (trial, basic, standard, premium); renew, upgrade or suspend licences |
+| **Licensing** | Plan, expiry, member limit and feature list per chama; expired or suspended licences block the chama; features gate whole modules |
+| **Auth** | Register, login, refresh-token rotation with reuse detection, logout / logout everywhere, login lockout, email verification, forgot / reset / change password |
+| **Members & roles** | Applications, approval, suspension, invitations; roles (member, treasurer, secretary, chairperson, auditor) mapped to 33 fine-grained permissions that each chama can re-map |
+| **Contributions** | Automatic periods (monthly or weekly), payments by cash / bank / M-Pesa, allocation across savings products, arrears, advances, late periods, reversals |
+| **Savings products & member accounts** | Deposits, share capital, welfare and custom products; an account per member per product with statements |
+| **Penalties** | Nightly late-contribution penalties, fines, part-payments, waivers |
+| **Loans** | Eligibility, loan products, guarantors, quorum approval, disbursement, repayment schedule, repayments |
+| **Expenses** | Maker-checker approval, payment through the ledger, optional link to an investment |
+| **Investments** | Proposal, quorum approval, funding, deposits, income (paid out or reinvested), withdrawals, valuations, closure, profitability and portfolio |
+| **Ledger** | Double-entry books per chama: chart of accounts, journal, manual entries, reversals, statements, trial balance |
+| **Reports & dashboards** | Financial position, income statement, cash book, contribution matrix, loan ageing and PAR30, savings register, member statements; official and member dashboards |
+| **Audit log** | Append-only record of every accountable action |
+| **Opening-balance import** | Excel template → preview with row-level problems → one-time, all-or-nothing import |
+| **Email notifications** | Verification, password reset, invitations, welcome, contribution receipts, loan and penalty notices |
 
 ---
 
 ## 🏗️ Architecture
 
-This system is built as a **microservices architecture** following Domain-Driven Design (DDD), Clean Architecture, and Event-Driven Architecture principles.
+The backend is a **modular monolith** ([ADR-006](docs/architecture/ADR-006-modular-monolith-over-microservices.md)): one Spring Boot application and one PostgreSQL database, split into modules with microservice-style boundaries. A cost analysis showed 11 separately hosted services would cost about 10× more at this stage; the module boundaries keep extraction possible later.
 
-### Why microservices for a Chama system?
+```
+                 Web / mobile client
+                         │  HTTPS, JSON, Bearer JWT
+┌────────────────────────▼─────────────────────────────────────────────┐
+│ Spring Boot application  (port 8080)                                 │
+│                                                                      │
+│  Security filter chain: JWT validation → tenant from token           │
+│  Licence interceptor: licence valid? feature included?               │
+│  Method security: @RequiresChamaPermission / @RequiresChamaMembership│
+│                                                                      │
+│  ┌──────┐ ┌───────┐ ┌────────┐ ┌──────────────┐ ┌─────────┐ ┌──────┐ │
+│  │ auth │ │ chama │ │ member │ │ contribution │ │ account │ │ loan │ │
+│  └──────┘ └───────┘ └────────┘ └──────────────┘ └─────────┘ └──────┘ │
+│  ┌─────────┐ ┌─────────┐ ┌────────────┐ ┌────────┐ ┌────────────┐    │
+│  │ penalty │ │ expense │ │ investment │ │ report │ │ dataimport │    │
+│  └─────────┘ └─────────┘ └────────────┘ └────────┘ └────────────┘    │
+│  ┌──────────────────────┐ ┌───────┐ ┌──────────────┐                 │
+│  │ transaction (ledger) │ │ audit │ │ notification │                 │
+│  └──────────────────────┘ └───────┘ └──────────────┘                 │
+│                                                                      │
+│  Domain events: Spring Modulith, persisted in an outbox table and    │
+│  delivered after commit (emails are sent asynchronously, retried)    │
+└───────────┬─────────────────────────────────────────┬────────────────┘
+            │                                         │
+   PostgreSQL 16                                SMTP server
+   one database, one schema per module,         (Mailpit locally)
+   row-level security per chama
+```
 
-- **Independent deployability** — the M-Pesa payment adapter can be updated without touching loan logic
-- **Fault isolation** — a reporting service outage does not affect contribution recording
-- **Team scalability** — each bounded context (loans, contributions, penalties) can be owned by a separate team
-- **Technology fit** — financial systems benefit from strict separation of concerns and explicit audit trails
+### Modules
 
-### High-Level System Design
-┌─────────────────────────────────────────────────────────┐
-│ CLIENT TIER │
-│ Web App · Mobile App · Admin Dashboard │
-└───────────────────────┬─────────────────────────────────┘
-│ HTTPS
-┌───────────────────────▼─────────────────────────────────┐
-│ API GATEWAY (Spring Cloud Gateway) │
-│ JWT Validation · Rate Limiting · Routing │
-└──┬──────┬──────┬──────┬──────┬──────┬──────┬───────────┘
-│ │ │ │ │ │ │
-▼ ▼ ▼ ▼ ▼ ▼ ▼
-[Auth] [Member] [Contrib] [Loan] [Penalty] [Invest] [Report]
-│ │ │ │ │ │ │
-└──────┴──────┴──┬───┴──────┴──────┴──────┘
-│
-┌───────────▼──────────────┐
-│ RabbitMQ Event Bus │
-│ chama.events (topic) │
-│ · member.created │
-│ · contribution.received│
-│ · loan.approved │
-│ · penalty.created │
-└───────────┬──────────────┘
-│
-┌───────────▼──────────────┐
-│ [Notification] [Txn] │
-│ [Reporting] [M-Pesa] │
-└──────────────────────────┘
-### Architecture Decisions
+Each module lives in `backend/src/main/java/ke/chama/modules/<module>` and is laid out in hexagonal layers: `api` (what other modules may use), `application` (use cases and ports), `domain` (model, events, exceptions), `infrastructure` (persistence, scheduling, adapters) and `presentation` (controllers and DTOs).
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **Communication** | Sync (OpenFeign) + Async (RabbitMQ) | Feign for real-time queries, RabbitMQ for decoupled events |
-| **Database strategy** | One PostgreSQL schema per service | True bounded context isolation; no cross-service JOINs |
-| **Auth** | Stateless JWT (15min access + 7-day refresh) | Scales horizontally; no session store needed |
-| **Money storage** | `BIGINT` (KES cents) | Avoids floating-point precision issues in financial calculations |
-| **Primary keys** | `UUID v4` | Prevents ID enumeration attacks; works across distributed services |
-| **API versioning** | URI versioning (`/api/v1/`) | Explicit, easy to route at gateway level |
+| Module | Schema | Responsibility |
+|--------|--------|----------------|
+| `auth` | `auth` | Users, passwords, JWT access tokens, refresh tokens, login attempts, email links |
+| `chama` | `chama` | Chamas (tenants), their rules, licences, platform onboarding |
+| `member` | `member` | Memberships, roles, role → permission mapping, permission checks |
+| `contribution` | `contribution` | Contribution periods, payments, allocation, standings and arrears |
+| `account` | `account` | Savings products and member accounts |
+| `penalty` | `penalty` | Late-contribution penalties, fines, payments, waivers |
+| `loan` | `loan` | Loan products, applications, guarantors, approvals, schedules, repayments |
+| `expense` | `expense` | Expenses with maker-checker approval |
+| `investment` | `investment` | Investments, transactions, valuations, performance |
+| `transaction` | `ledger` | Double-entry ledger: chart of accounts, journal entries |
+| `report` | (reads others) | Financial statements, reports and dashboards |
+| `audit` | `audit` | Append-only audit log |
+| `dataimport` | `dataimport` | Opening-balance import from Excel |
+| `notification` | (none) | Emails, triggered by other modules' events |
+
+Shared building blocks (`ke.chama.shared`): `Money`, `PhoneNumber`, the response envelope and exception handling, security annotations and tenancy.
+
+Boundaries are enforced by tests: Spring Modulith verifies that modules only use each other's `api` packages and published events (`ModularityTests`), and ArchUnit checks the layering rules (`ArchitectureTests`).
+
+### Multi-tenancy
+
+Every chama is a tenant in one shared database ([ADR-007](docs/architecture/ADR-007-multi-tenancy-shared-database.md)):
+
+- A user belongs to exactly one chama. Logged-in requests take the chama from the signed access token; public auth endpoints name it with the `X-Chama-Code` header. URLs never carry a chama id.
+- Isolation is enforced twice: Hibernate's tenant filter on every query, and **PostgreSQL row-level security** on every tenant table. The application switches each connection to the restricted `chama_app` role, so a missed filter in code still cannot leak another chama's data.
+- Platform administrators belong to a separate platform tenant and are the only ones who can create chamas.
+
+### Key decisions
+
+| Decision | Choice | Why |
+|----------|--------|-----|
+| **Deployment** | Modular monolith ([ADR-006](docs/architecture/ADR-006-modular-monolith-over-microservices.md)) | ~10× cheaper to host at early scale; modules stay extractable |
+| **Tenancy** | Shared database, `tenant_id` + row-level security ([ADR-007](docs/architecture/ADR-007-multi-tenancy-shared-database.md)) | One database to run; isolation guaranteed by PostgreSQL |
+| **Events** | Spring Modulith application events with a JDBC outbox | Reliable after-commit side effects without a broker |
+| **Auth** | Stateless JWT (15 min) + rotating refresh tokens (7 days) stored hashed in PostgreSQL | Revocable sessions, theft detection on reuse |
+| **Authorisation** | Per-chama permissions checked on every request, not stored in the token | Role changes and suspensions apply immediately |
+| **Money** | `BIGINT` minor units (KES cents) via the `Money` value type | No floating-point errors |
+| **Rates** | Integer basis points (100 = 1%) | Exact percentages |
+| **Books** | Double-entry ledger; entries are reversed, never edited or deleted | Auditability; balance sheet always balances |
+| **Primary keys** | UUID | No enumeration across tenants |
+| **API** | URI versioning (`/api/v1/`), one JSON envelope for every response | Predictable clients |
 
 ---
 
-## 🔧 Microservices
+## 🧰 Tech Stack
 
-| Service | Port | Responsibility | Key Tech |
-|---------|------|---------------|----------|
-| `api-gateway` | 8080 | Single entry point, JWT validation, routing | Spring Cloud Gateway, Eureka |
-| `auth-service` | 8081 | Login, registration, JWT issuance & refresh | Spring Security 6, JJWT |
-| `member-service` | 8082 | Member onboarding, profiles, RBAC, approval | Spring Data JPA, Flyway |
-| `contribution-service` | 8083 | Monthly contributions, savings balances, cycles | Spring Data JPA, @Scheduled |
-| `loan-service` | 8084 | Loan applications, approval, disbursement, repayment | Spring Data JPA, OpenFeign |
-| `penalty-service` | 8085 | Auto-penalties, waivers, penalty reports | RabbitMQ consumer |
-| `investment-service` | 8086 | MMF deposits, monthly returns, profit sharing | Spring Data JPA |
-| `transaction-service` | 8087 | Double-entry ledger, audit trail, reversals | RabbitMQ consumer |
-| `notification-service` | 8088 | SMS (Africa's Talking), email, push notifications | RabbitMQ consumer |
-| `reporting-service` | 8089 | Member statements, PDFs, financial summaries | iText/PDFBox, CQRS read side |
-| `mpesa-adapter` | 8090 | M-Pesa STK push, C2B callbacks, B2C payouts | Safaricom Daraja API |
+| Concern | Technology |
+|---------|------------|
+| Language / runtime | Java 25 |
+| Framework | Spring Boot 4.1 (Web MVC, Security, OAuth2 Resource Server, Data JPA, Validation, Mail, Actuator) |
+| Modularity & events | Spring Modulith 2.1 (JDBC event publication registry) |
+| Database | PostgreSQL 16, Flyway migrations, row-level security |
+| Spreadsheets | Apache POI (opening-balance import) |
+| API docs | springdoc-openapi (Swagger UI) |
+| Testing | JUnit 5, Spring Boot Test, Testcontainers (PostgreSQL), Spring Modulith test, ArchUnit |
+| Build | Maven wrapper (`./mvnw`) |
+| Packaging | Multi-stage Docker image (layered JAR, non-root user) |
+| CI/CD | GitHub Actions → GitHub Container Registry |
+| Local infrastructure | Docker Compose: PostgreSQL, Mailpit, RabbitMQ, Redis |
 
-### Service Interaction Map
-
-POST /contributions ──► contribution-service
-│
-├──► [event] ContributionReceived
-│ ├──► transaction-service (records ledger entry)
-│ └──► notification-service (sends SMS receipt)
-│
-└──► [event] ContributionMissed (if month-end missed)
-├──► penalty-service (creates penalty record)
-└──► notification-service (sends reminder SMS)
-
-POST /loans/apply ──► loan-service
-│
-├──► [Feign] member-service (verify eligibility)
-├──► [Feign] contribution-service (check savings balance)
-│
-├──► [event] LoanApproved
-│ └──► notification-service (approval SMS)
-│
-└──► [event] LoanDisbursed
-├──► mpesa-adapter (B2C payout)
-├──► transaction-service (ledger entry)
-└──► notification-service (disbursement SMS)
+RabbitMQ and Redis are provisioned and the application connects to them, but no module uses them yet. Events are delivered in-process; RabbitMQ is the planned transport when a module is extracted (ADR-006).
 
 ---
 
@@ -165,323 +200,297 @@ POST /loans/apply ──► loan-service
 
 ### Prerequisites
 
-- Java 25+
-- Docker & Docker Compose
-- Maven 3.9+
+- JDK 25
+- Docker with Docker Compose
+- (Maven is not needed: use the wrapper `./mvnw`, or `mvnw.cmd` on Windows)
 
-### Run the full stack locally
+### 1. Start the infrastructure
 
 ```bash
 git clone https://github.com/CalebMUC/chama-management-system.git
 cd chama-management-system
 
-# Start all infrastructure (PostgreSQL, RabbitMQ, Redis, Zipkin)
 docker compose -f infrastructure/docker/docker-compose.yml up -d
-
-# Start all services (from repo root)
-./scripts/start-all.sh
-
-# Or start individual service
-cd services/member-service
-mvn spring-boot:run
 ```
 
-### Verify everything is running
+This starts PostgreSQL, Mailpit (catches all outgoing email), RabbitMQ and Redis on non-default ports so they don't clash with local installs.
 
-| URL | Service |
-|-----|---------|
-| http://localhost:8080 | API Gateway |
-| http://localhost:15672 | RabbitMQ Management (guest/guest) |
-| http://localhost:3000 | Grafana Dashboards (admin/admin) |
-| http://localhost:9090 | Prometheus |
-| http://localhost:9411 | Zipkin Tracing |
-
-### Walk through the core business flow
+### 2. Run the backend
 
 ```bash
-# 1. Register a member
-curl -X POST http://localhost:8080/api/v1/members \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstName": "Jane",
-    "lastName": "Wanjiku",
-    "email": "jane.wanjiku@email.com",
-    "phoneNumber": "+254712345678",
-    "nationalId": "12345678"
-  }'
-
-# 2. Login and get JWT
-TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"jane.wanjiku@email.com","password":"Password123!"}' \
-  | jq -r '.accessToken')
-
-# 3. Record monthly contribution
-curl -X POST http://localhost:8080/api/v1/contributions \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "memberId": "...",
-    "amount": 500000,
-    "period": "2025-01",
-    "paymentMethod": "MPESA",
-    "mpesaReference": "QGH7K9XYZ"
-  }'
-
-# 4. Apply for a loan
-curl -X POST http://localhost:8080/api/v1/loans/apply \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "memberId": "...",
-    "amount": 1500000,
-    "termMonths": 6,
-    "purpose": "Business expansion"
-  }'
+cd backend
+PLATFORM_ADMIN_EMAIL=admin@platform.local \
+PLATFORM_ADMIN_PASSWORD='Admin12345' \
+./mvnw spring-boot:run
 ```
+
+Flyway creates the schemas on first start. The two `PLATFORM_ADMIN_*` variables create the first platform administrator, who can then onboard chamas. Everything else has local defaults.
+
+### 3. Open it
+
+| URL | What |
+|-----|------|
+| http://localhost:8080/swagger-ui.html | Swagger UI (try every endpoint) |
+| http://localhost:8080/v3/api-docs | OpenAPI document |
+| http://localhost:8080/actuator/health | Health check |
+| http://localhost:18025 | Mailpit: every email the app sends (verification links, receipts, …) |
+| http://localhost:15672 | RabbitMQ management (guest / guest) |
+| `localhost:15432` | PostgreSQL `chama_db` (postgres / postgres) |
+
+### 4. Walk through the core flow
+
+```bash
+API=http://localhost:8080/api/v1
+
+# 1. Platform admin logs in (no chama code)
+ADMIN=$(curl -s -X POST $API/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"admin@platform.local","password":"Admin12345"}' | jq -r '.data.accessToken')
+
+# 2. Onboard a chama with its first administrator (chairperson, member #1). 30-day trial licence.
+curl -s -X POST $API/platform/chamas -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d '{
+  "chama": { "name": "Mokica Investment Group", "code": "mokica",
+             "admin": { "email": "chair@mokica.test", "phoneNumber": "0712345678", "password": "Chair12345",
+                        "firstName": "Grace", "lastName": "Achieng" } } }' | jq '.message'
+
+# 3. A member registers with the chama code (their application waits for approval)
+curl -s -X POST $API/auth/register -H 'X-Chama-Code: mokica' -H 'Content-Type: application/json' -d '{
+  "email": "jane@mokica.test", "phoneNumber": "0722000111", "password": "Jane12345",
+  "firstName": "Jane", "lastName": "Wanjiku" }' | jq '.message'
+
+# 4. The chairperson logs in with the chama code and approves the application
+CHAIR=$(curl -s -X POST $API/auth/login -H 'X-Chama-Code: mokica' -H 'Content-Type: application/json' \
+  -d '{"email":"chair@mokica.test","password":"Chair12345"}' | jq -r '.data.accessToken')
+
+APPLICANT=$(curl -s "$API/members?status=PENDING_APPROVAL" -H "Authorization: Bearer $CHAIR" | jq -r '.data[0]')
+curl -s -X POST "$API/members/$(echo "$APPLICANT" | jq -r '.membershipId')/approve" \
+  -H "Authorization: Bearer $CHAIR" | jq '.message'
+
+# 5. Record Jane's contribution (KES 5,000 = 500000 cents) by M-Pesa
+curl -s -X POST $API/contributions -H "Authorization: Bearer $CHAIR" -H 'Content-Type: application/json' -d '{
+  "memberUserId": "'"$(echo "$APPLICANT" | jq -r '.userId')"'",
+  "amountMinor": 500000, "method": "MPESA", "reference": "QK7H2XY9ZB" }' | jq '.data.allocations'
+
+# 6. The chama dashboard
+curl -s $API/dashboard -H "Authorization: Bearer $CHAIR" | jq '.data.cash, .data.contributions'
+```
+
+Open Mailpit to see the verification emails and Jane's contribution receipt.
+
+### Configuration
+
+Every setting has a local default in [`application.yaml`](backend/src/main/resources/application.yaml); deployed environments set these environment variables:
+
+| Variable | Purpose | Local default |
+|----------|---------|---------------|
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | PostgreSQL connection (also used by Flyway) | `jdbc:postgresql://localhost:15432/chama_db`, `postgres`, `postgres` |
+| `JWT_SECRET` | HS256 signing key, at least 32 bytes. **Required under the `prod` profile**: startup fails on the development secret | development-only value |
+| `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD` | Creates the first platform administrator at start-up if both are set | unset |
+| `FRONTEND_BASE_URL` | Where emailed links point (`/verify-email`, `/reset-password`, `/join`) | `http://localhost:3000` |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_SMTP_AUTH`, `MAIL_STARTTLS`, `MAIL_FROM` | SMTP | Mailpit on `localhost:11025` |
+| `REDIS_HOST`, `REDIS_PORT` | Redis | `localhost:16379` |
+| `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | RabbitMQ | `localhost:15673`, `guest`, `guest` |
+| `SPRING_PROFILES_ACTIVE=prod` | Production: Swagger UI and API docs off, development JWT secret refused | — |
+
+Other settings in `application.yaml`: business time zone (`Africa/Nairobi`), token lifetimes (15 min / 7 days), login lockout (5 failures in 15 min), trial length (30 days), upload limit (5 MB).
 
 ---
 
-## 📡 API Reference
+## 📡 API
 
-Full OpenAPI 3.0 specifications are in [`docs/api/openapi/`](docs/api/openapi/).
+All endpoints are under `/api/v1`, take and return JSON, and use one response envelope:
 
-### Authentication
+```json
+{ "success": true,  "message": "Contribution recorded", "data": { … }, "timestamp": "2026-11-08T07:15:02Z" }
+{ "success": false, "message": "One or more fields are invalid", "data": null,
+  "error": { "code": "VALIDATION_FAILED", "status": 400, "path": "/api/v1/contributions",
+             "fields": [ { "field": "amountMinor", "message": "must be greater than 0" } ] },
+  "timestamp": "…" }
+```
 
-POST /api/v1/auth/register Register new user account
-POST /api/v1/auth/login Login, returns JWT pair
-POST /api/v1/auth/refresh Refresh access token
-POST /api/v1/auth/logout Invalidate refresh token
+Paged lists add `meta` (`page`, `size`, `totalElements`, `totalPages`, `hasNext`, `hasPrevious`). Clients branch on the stable `error.code`; `message` is always safe to show to users. Amounts are integer minor units (`500000` = KES 5,000.00) and rates are basis points.
 
-### Member Management
+| Area | Base path |
+|------|-----------|
+| Auth & account | `/auth` (register, login, refresh, logout, logout-all, me, email verification, password forgot/reset/change) |
+| My chama | `/chama`, `/chama/settings`, `/chama/license` |
+| Members & roles | `/members`, `/roles` |
+| Contributions | `/contributions` (payments, periods, standings, me) |
+| Savings | `/savings-products`, `/member-accounts` |
+| Penalties | `/penalties` |
+| Loans | `/loans`, `/loan-products` |
+| Expenses | `/expenses` |
+| Investments | `/investments` |
+| Ledger | `/ledger` (accounts, entries, statements, trial balance) |
+| Dashboards & reports | `/dashboard`, `/reports` |
+| Audit | `/audit-log` |
+| Import | `/imports/opening-balances` |
+| Platform admin | `/platform/chamas` |
 
-POST /api/v1/members Register new Chama member
-GET /api/v1/members List all members (paginated)
-GET /api/v1/members/{id} Get member profile
-PUT /api/v1/members/{id} Update member profile
-PATCH /api/v1/members/{id}/approve Approve pending member (CHAIRMAN only)
-PATCH /api/v1/members/{id}/suspend Suspend active member
-GET /api/v1/members/{id}/summary Member financial summary
+Documentation:
 
-### Contributions
+- **Swagger UI** on a running backend: `/swagger-ui.html` (disabled under `prod`)
+- **Response format**: [`docs/api/response-format.md`](docs/api/response-format.md)
+- **Postman collection**: [`docs/api/postman/`](docs/api/postman/)
+- **Frontend build guide, full endpoint reference and TypeScript types**: [`docs/frontend/`](docs/frontend/)
 
-POST /api/v1/contributions Record contribution payment
-GET /api/v1/contributions List contributions (filterable)
-GET /api/v1/contributions/member/{id} Member contribution history
-GET /api/v1/contributions/cycles List contribution cycles
-GET /api/v1/contributions/summary Group contribution summary
-
-### Loans
-
-POST /api/v1/loans/apply Submit loan application
-GET /api/v1/loans List all loans (paginated)
-GET /api/v1/loans/{id} Loan details
-PATCH /api/v1/loans/{id}/approve Approve loan (TREASURER only)
-PATCH /api/v1/loans/{id}/reject Reject application
-POST /api/v1/loans/{id}/disburse Trigger M-Pesa disbursement
-POST /api/v1/loans/{id}/repayments Record repayment
-GET /api/v1/loans/{id}/statement Loan statement PDF
-GET /api/v1/loans/member/{memberId} Member's loan history
-
-### Penalties
-
-GET /api/v1/penalties List all penalties
-GET /api/v1/penalties/member/{id} Member's penalties
-PATCH /api/v1/penalties/{id}/waive Waive penalty (CHAIRMAN only)
-GET /api/v1/penalties/report Penalty summary report
-
-### Reports
-
-GET /api/v1/reports/member/{id}/statement Member statement (PDF)
-GET /api/v1/reports/financial-summary Group financial overview
-GET /api/v1/reports/contributions Contribution report
-GET /api/v1/reports/loans Loan portfolio report
-
-### Common Query Parameters
-
-?page=0&size=20&sort=createdAt,desc Pagination & sorting
-?startDate=2025-01-01&endDate=2025-12-31 Date range filtering
-?status=ACTIVE Status filtering
-?search=wanjiku Full-text search
+The API has no CORS configuration; serve a browser frontend from the same origin (reverse proxy, or a dev-server proxy locally).
 
 ---
 
 ## 🔐 Security Model
 
-ROLE_MEMBER → View own profile, contributions, loans, statements
-ROLE_TREASURER → All MEMBER permissions + approve/reject loans, record contributions
-ROLE_SECRETARY → All MEMBER permissions + manage member records, generate reports
-ROLE_CHAIRMAN → All permissions + approve members, waive penalties, override decisions
-ROLE_ADMIN → System administration, user management, configuration
+**Two levels of role:**
 
-JWT access tokens expire in **15 minutes**. Refresh tokens expire in **7 days** and are stored server-side (Redis) to support revocation on logout.
+| Level | Roles | Where it applies |
+|-------|-------|------------------|
+| Platform | `ROLE_ADMIN` (platform administrator), `ROLE_USER` | `/api/v1/platform/**`: onboarding chamas, licences |
+| Chama | `MEMBER`, `TREASURER`, `SECRETARY`, `CHAIRPERSON`, `AUDITOR` (a member can hold several) | Everything inside a chama |
 
----
+Endpoints check **permissions**, never role names. Each chama starts with a default role → permission mapping (treasurer records money, secretary handles membership and approves spending, chairperson can do everything, auditor sees everything and changes nothing) and the chairperson can re-map it. Permissions are read from the database on every request, so suspensions and role changes apply immediately. Viewing your own records needs only an active membership.
 
-## 📊 Observability
+**Sessions:** JWT access tokens expire after **15 minutes**. Refresh tokens last **7 days**, are stored hashed in PostgreSQL, and rotate on every use; presenting an already-used refresh token revokes all of the user's sessions. Five failed logins within 15 minutes lock the email for 15 minutes. Passwords are BCrypt-hashed (8–72 characters, a letter and a digit).
 
-### Metrics (Prometheus + Grafana)
+**Accountability:** maker-checker approval with a configurable quorum; no one acts on their own records; every change is written to an append-only audit log (the application's database role cannot update or delete it).
 
-Business metrics exposed on `/actuator/prometheus`:
-
-chama_contributions_received_total{currency="KES"}
-chama_loans_disbursed_total{currency="KES"}
-chama_penalties_created_total
-chama_active_members_count
-chama_loan_approval_duration_seconds    
-
-### Distributed Tracing (Zipkin)
-
-Every request carries a `X-B3-TraceId` header through the full service chain. A single "apply for loan" request can be traced across gateway → loan-service → member-service → contribution-service → notification-service.
+**Tenant isolation:** PostgreSQL row-level security on every chama-owned table (see [Multi-tenancy](#multi-tenancy)).
 
 ---
 
-## 🗃️ Database Design
+## 🗃️ Database
 
-Each service owns its own PostgreSQL schema. No cross-service foreign keys. Cross-service data needs are satisfied by events or Feign calls.
+One PostgreSQL database, `chama_db`, with one schema per module: `auth`, `chama`, `member`, `contribution`, `account`, `penalty`, `loan`, `expense`, `investment`, `ledger`, `audit`, `dataimport`, plus Spring Modulith's event publication table.
 
-chama_auth → users, roles, permissions, refresh_tokens
-chama_members → members, member_profiles, kyc_documents, approval_workflows
-chama_contributions → contributions, savings_accounts, contribution_cycles
-chama_loans → loan_applications, loans, loan_guarantors, repayment_schedules
-chama_penalties → penalties, penalty_rules, penalty_accounts
-chama_investments → investment_accounts, mmf_deposits, monthly_returns, profit_shares
-chama_transactions → transactions, ledger_entries, audit_log
+- Migrations live in [`backend/src/main/resources/db/migration`](backend/src/main/resources/db/migration) (`V1` … `V20`) and run at start-up through a separate owner connection. Hibernate only validates the schema.
+- Every chama-owned table has `tenant_id` and the standard `tenant_isolation` row-level security policy; new module migrations must add both and grant the schema to `chama_app`.
+- In production, the database user must not be a superuser and must be granted the `chama_app` role (created by `V9`).
 
----
+### Scheduled jobs
 
-## ⚡ Event-Driven Architecture
+| Job | When (Africa/Nairobi) | What |
+|-----|-----------------------|------|
+| Late-contribution penalties | 01:00 daily | Penalises every late period not yet penalised, for every chama |
+| Refresh-token cleanup | 02:30 daily | Deletes expired refresh tokens |
 
-All inter-service communication that doesn't require a synchronous response uses RabbitMQ.
-
-**Exchange:** `chama.events` (topic exchange)
-
-| Routing Key | Event | Publisher | Consumers |
-|-------------|-------|-----------|-----------|
-| `member.created` | MemberCreated | member-service | notification, auth |
-| `member.approved` | MemberApproved | member-service | notification, transaction |
-| `contribution.received` | ContributionReceived | contribution-service | transaction, notification |
-| `contribution.missed` | ContributionMissed | contribution-service | penalty, notification |
-| `loan.approved` | LoanApproved | loan-service | notification, transaction |
-| `loan.disbursed` | LoanDisbursed | loan-service | mpesa-adapter, transaction, notification |
-| `loan.repayment.recorded` | LoanRepaymentRecorded | loan-service | transaction, notification |
-| `penalty.created` | PenaltyCreated | penalty-service | transaction, notification |
-| `investment.profit.distributed` | ProfitDistributed | investment-service | transaction, notification |
-
-Failed message processing routes to `chama.dlq` after 3 retries with exponential backoff.
+Contribution periods are opened automatically (and missed ones caught up) whenever contributions are used.
 
 ---
 
-## 🧪 Testing Strategy
-
-Unit tests → Domain logic, service layer (JUnit 5, Mockito)
-Integration tests → Full service stack with real DB (TestContainers + PostgreSQL)
-API tests → HTTP layer with MockMvc
-Contract tests → Service-to-service API contracts (Spring Cloud Contract)
-E2E tests → Critical business flows (contribution → loan → repayment)
+## 🧪 Testing
 
 ```bash
-# Run all tests
-mvn test
-
-# Run with TestContainers (requires Docker)
-mvn verify -P integration-tests
-
-# Coverage report (target: >80%)
-mvn jacoco:report
+cd backend
+./mvnw verify
 ```
+
+Integration tests start their own PostgreSQL with **Testcontainers**, so Docker must be running. They also expect Redis and RabbitMQ on the docker-compose ports (start the compose stack first).
+
+| Kind | Examples |
+|------|----------|
+| Domain unit tests | `MoneyTest`, `LoanTest`, `MemberStandingTest`, `PaymentAllocationTest`, `FinancialStatementsTest`, `LoanAgingTest` |
+| Integration tests (HTTP → database) | `AuthFlowIntegrationTests`, `ContributionIntegrationTests`, `LoanIntegrationTests`, `LedgerIntegrationTests`, `ReportIntegrationTests`, `OpeningBalanceImportIntegrationTests` |
+| Tenant isolation | `TenancyIntegrationTests` |
+| Architecture | `ModularityTests` (Spring Modulith module boundaries), `ArchitectureTests` (ArchUnit layering) |
+| API contract | `ResponseEnvelopeIntegrationTests`, `ApiDocsIntegrationTests` |
 
 ---
 
 ## 🚢 Deployment
 
-### Docker Compose (local development)
+### Docker image
 
 ```bash
-docker compose -f infrastructure/docker/docker-compose.yml up
+docker build -t chama-backend backend/
+docker run -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=prod -e JWT_SECRET=<32+ random bytes> \
+  -e DB_URL=jdbc:postgresql://<host>:5432/chama_db -e DB_USERNAME=<user> -e DB_PASSWORD=<password> \
+  -e MAIL_HOST=<smtp host> -e FRONTEND_BASE_URL=https://<frontend> \
+  chama-backend
 ```
 
-### Kubernetes (production-like)
+The [`Dockerfile`](backend/Dockerfile) is multi-stage (JDK build, JRE runtime), uses Spring Boot's layered JAR so code changes only replace the last layer, and runs as a non-root user.
 
-```bash
-# Apply base manifests
-kubectl apply -k infrastructure/kubernetes/overlays/local
+### CI/CD (GitHub Actions)
 
-# Check status
-kubectl get pods -n chama-system
+[`backend-ci-cd.yml`](.github/workflows/backend-ci-cd.yml) runs when files under `backend/` change:
 
-# Access via ingress
-curl http://chama.local/api/v1/members
-```
+1. **Build and test** on pushes to `main` and `feat/**`, on pull requests to `main`, and on manual runs: JDK 25, `./mvnw verify` with Redis and RabbitMQ service containers, test reports uploaded as artifacts.
+2. **Publish image** on pushes to `main` and `v*` tags: builds the Docker image and pushes it to `ghcr.io/<owner>/chama-backend`, tagged by branch, semantic version and commit SHA.
 
-### CI/CD Pipeline (GitHub Actions)
-
-Every push to `main`:
-1. Run unit + integration tests
-2. Build Docker images (multi-stage, ~180MB)
-3. Push to GitHub Container Registry (GHCR)
-4. Deploy to Kubernetes (rolling update, zero downtime)
-5. Run smoke tests against deployed environment
+There is no automated deployment step yet. `infrastructure/kubernetes/` (Kustomize base and overlays) and `infrastructure/monitoring/` (Prometheus, Grafana) are placeholders.
 
 ---
 
 ## 📁 Project Structure
 
+```
 chama-management-system/
-├── services/ # One folder per microservice
-│ ├── auth-service/
-│ ├── member-service/
-│ ├── contribution-service/
-│ ├── loan-service/
-│ ├── penalty-service/
-│ ├── investment-service/
-│ ├── transaction-service/
-│ ├── notification-service/
-│ ├── reporting-service/
-│ ├── mpesa-adapter/
-│ └── api-gateway/
+├── backend/                                Spring Boot application (the whole backend)
+│   ├── Dockerfile
+│   ├── pom.xml, mvnw, mvnw.cmd
+│   └── src/
+│       ├── main/java/ke/chama/
+│       │   ├── ChamaApplication.java
+│       │   ├── shared/                     Money, PhoneNumber, response envelope, security, tenancy
+│       │   └── modules/                    auth, chama, member, contribution, account, penalty, loan,
+│       │                                   expense, investment, transaction, report, audit,
+│       │                                   dataimport, notification
+│       ├── main/resources/
+│       │   ├── application.yaml, application-prod.yaml
+│       │   └── db/migration/               Flyway migrations V1–V20
+│       └── test/java/ke/chama/             unit, integration, tenancy and architecture tests
 ├── infrastructure/
-│ ├── docker/ # docker-compose.yml
-│ ├── kubernetes/ # K8s manifests (Kustomize)
-│ └── monitoring/ # Prometheus + Grafana config
+│   ├── docker/docker-compose.yml           PostgreSQL, Mailpit, RabbitMQ, Redis
+│   ├── kubernetes/                         placeholders (base, overlays/local, overlays/production)
+│   └── monitoring/                         placeholders (Prometheus, Grafana)
 ├── docs/
-│ ├── architecture/ # Architecture Decision Records (ADRs)
-│ ├── api/openapi/ # OpenAPI 3.0 specs
-│ └── runbooks/ # Operational runbooks
-└── .github/workflows/ # CI/CD pipelines
+│   ├── architecture/                       Architecture Decision Records
+│   ├── api/                                response format, Postman collection
+│   └── frontend/                           frontend build guide, API reference, TypeScript types
+└── .github/workflows/backend-ci-cd.yml     build, test, publish image
+```
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] Repository structure and documentation
-- [ ] Auth Service — JWT authentication
-- [ ] Member Service — onboarding & approval workflow
-- [ ] Contribution Service — monthly cycles & savings
-- [ ] Loan Service — application, approval & disbursement
-- [ ] Penalty Service — automated penalty engine
-- [ ] Investment Service — MMF tracking & profit sharing
-- [ ] Transaction Service — double-entry ledger
-- [ ] Notification Service — SMS & email via Africa's Talking
-- [ ] Reporting Service — statements & PDF generation
-- [ ] M-Pesa Adapter — Safaricom Daraja integration
-- [ ] API Gateway — routing, rate limiting, auth filter
-- [ ] Kubernetes manifests & Helm charts
-- [ ] Monitoring dashboards (Prometheus + Grafana)
-- [ ] CI/CD pipeline (GitHub Actions)
+**Done**
+
+- [x] Foundations: shared kernel, module boundaries, response envelope, Swagger
+- [x] Auth: JWT, refresh-token rotation, lockout, email verification, password recovery
+- [x] Chamas, memberships, per-chama roles and permissions, audit log
+- [x] Multi-tenancy with row-level security; licences and platform onboarding
+- [x] Double-entry ledger
+- [x] Contributions: periods, payments, arrears
+- [x] Penalties: automatic late penalties, fines, payments, waivers
+- [x] Loans: applications, guarantors, quorum approval, disbursement, repayments
+- [x] Expenses with maker-checker approval
+- [x] Investments with approval, returns and profitability
+- [x] Opening-balance import from Excel
+- [x] Savings products, member accounts and loan products
+- [x] Reports and dashboards
+- [x] CI: build, test and publish the Docker image
+
+**Next**
+
+- [ ] Web frontend (specification in [`docs/frontend/`](docs/frontend/))
+- [ ] M-Pesa integration (Safaricom Daraja: STK push, C2B callbacks, B2C disbursement)
+- [ ] SMS notifications (Africa's Talking)
+- [ ] Dividends / profit distribution to members
+- [ ] Member exit with final settlement
+- [ ] PDF statements and exports
+- [ ] CORS configuration for separately hosted frontends
+- [ ] Kubernetes manifests and automated deployment
+- [ ] Monitoring: Prometheus metrics and Grafana dashboards
 - [ ] Load testing (k6)
 
 ---
 
 ## 🧠 Architecture Decision Records
 
-Key decisions documented in [`docs/architecture/`](docs/architecture/):
+In [`docs/architecture/`](docs/architecture/):
 
-- [ADR-001](docs/architecture/ADR-001-database-per-service.md) — Database-per-service over shared schema
-- [ADR-002](docs/architecture/ADR-002-rabbitmq-over-kafka.md) — RabbitMQ over Kafka for this scale
-- [ADR-003](docs/architecture/ADR-003-jwt-stateless-auth.md) — Stateless JWT with Redis-backed refresh
-- [ADR-004](docs/architecture/ADR-004-money-as-bigint.md) — Storing money as BIGINT (KES cents)
-- [ADR-005](docs/architecture/ADR-005-uuid-primary-keys.md) — UUID primary keys over auto-increment
+- [ADR-006](docs/architecture/ADR-006-modular-monolith-over-microservices.md): Modular monolith over microservices
+- [ADR-007](docs/architecture/ADR-007-multi-tenancy-shared-database.md): Multi-tenancy in a shared database, with a licence per chama
 
 ---
 
@@ -497,4 +506,4 @@ Full-Stack Software Engineer · Nairobi, Kenya
 
 ## 📄 License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License: see [LICENSE](LICENSE) for details.

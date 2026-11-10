@@ -133,7 +133,8 @@ The caller's own membership in any status, plus effective permissions. **Call it
 - Permission: `MEMBER_VIEW`
 - Query: `status?: MembershipStatus`, `page`, `size`. Sorted by member number, then application date.
 - → `200 Paged<MemberView>`
-- Use `status=ACTIVE` for member pickers (contributions, fines, guarantors, statements). Fetch all pages (≤100 per page) and cache.
+- Use `status=ACTIVE` for officials' member pickers (contributions, fines, statements). Fetch all pages (≤100 per page) and cache.
+- Plain members do not hold `MEMBER_VIEW` by default; their guarantor picker uses `GET /loans/guarantor-candidates`.
 
 ### POST `/members/invitations`
 Emails a join link (`/join?chama=<code>`). The invitee still registers and is approved.
@@ -376,6 +377,11 @@ What the caller may borrow now under one product.
 #### GET `/loans/me`
 - Permission: active member → `200 MyLoansView` (each loan with schedule and repayments)
 
+#### GET `/loans/guarantor-candidates`
+- Permission: `LOAN_APPLY` → `200 GuarantorCandidate[]` `{ userId, memberNumber, name }`
+- Every active member except the caller, by member number. Use this for the guarantor picker: plain members
+  do not hold `MEMBER_VIEW`, so they cannot call `GET /members`.
+
 #### GET `/loans/guarantees`
 Loans the caller was asked to guarantee.
 - Permission: active member → `200 GuaranteeView[]`
@@ -428,7 +434,65 @@ Up to the outstanding amount; clears the oldest instalment first.
 
 ---
 
-## 10. Expenses (`/api/v1/expenses`) · Feature `EXPENSES`
+## 10. Payment submissions (`/api/v1/payment-submissions`)
+
+Members report payments they made themselves (usually by M-Pesa): a **contribution**, a **penalty
+payment** or a **loan repayment**. A report moves no money and changes no balance. It waits as
+`PENDING` until an official who holds the matching record permission (the treasurer by default) approves it.
+Approving records the real payment through `POST /contributions`, `/penalties/{id}/payments` or
+`/loans/{id}/repayments` under the approver's name, in the same transaction, with all the same rules.
+Rejecting needs a reason. The member is emailed either way, except for an approved contribution,
+which already sends the usual contribution receipt.
+
+| `kind` | `targetId` | Licence feature | Reviewer needs |
+|---|---|---|---|
+| `CONTRIBUTION` | none | `CONTRIBUTIONS` | `CONTRIBUTION_RECORD` |
+| `PENALTY_PAYMENT` | the penalty (from `GET /penalties/me` or `MemberDashboardView.penalties.outstanding`) | `PENALTIES` | `PENALTY_RECORD` |
+| `LOAN_REPAYMENT` | the loan (from `GET /loans/me`; must be `ACTIVE`) | `LOANS` | `LOAN_REPAYMENT_RECORD` |
+
+Statuses: `PENDING` → `APPROVED` | `REJECTED` (with `reviewNote` = reason) | `CANCELLED` (withdrawn by the member).
+Nobody reviews their own report, so a treasurer's own payment goes to another official (e.g. the chairperson).
+
+### POST `/payment-submissions`
+- Permission: `PAYMENT_SUBMIT` (every role by default) · Body: `SubmitPaymentRequest`
+  `{ "kind": "PENALTY_PAYMENT", "targetId": "…", "amountMinor": 50000, "method": "MPESA", "reference": "QK7…", "paidOn": "2026-11-09", "notes": "…" }`
+  `reference` is required unless `method` is `CASH`; `paidOn` defaults to today and cannot be in the future.
+- → `201 SubmissionView` — "Payment reported. The treasurer will confirm it once they have checked it."
+- Errors: `SUBMISSION_INVALID` (400), `SUBMISSION_TARGET_INVALID` (422: not your penalty/loan, already
+  closed, loan not active, more than is outstanding), `SUBMISSION_DUPLICATE_REFERENCE` (409: the code was already
+  reported or recorded), `LICENSE_FEATURE_NOT_INCLUDED`
+
+### GET `/payment-submissions/me?status=&page=&size=`
+- Permission: active member → `200 Paged<SubmissionView>` (pending first, then newest first)
+
+### POST `/payment-submissions/{id}/cancel`
+- Permission: active member, the submitter only, while `PENDING` → `200 SubmissionView` — "Report withdrawn"
+- Errors: `SUBMISSION_NOT_SUBMITTER` (403), `SUBMISSION_WRONG_STATUS` (409)
+
+### GET `/payment-submissions?status=&kind=&memberUserId=&page=&size=`
+The review queue: only the kinds the caller may review. Pending ones first (oldest first), then the rest newest first.
+- Permission: any of `CONTRIBUTION_RECORD`, `PENALTY_RECORD`, `LOAN_REPAYMENT_RECORD` → `200 Paged<SubmissionView>`
+
+### GET `/payment-submissions/reviewable-kinds`
+- Permission: as the queue → `200 SubmissionKind[]` (for the queue's kind filter)
+
+### GET `/payment-submissions/{id}`
+- Permission: the submitter, or an official who may review its kind → `200 SubmissionView`
+- Errors: `SUBMISSION_NOT_FOUND`, `ACCESS_DENIED`
+
+### POST `/payment-submissions/{id}/approve`
+- Permission: the record permission for its `kind` · Body (optional): `{ "note": "Seen on the statement" }`
+- → `200 SubmissionView` — "Payment confirmed and recorded"
+- Errors: `SUBMISSION_WRONG_STATUS` (409), `SUBMISSION_SELF_REVIEW` (403), `ACCESS_DENIED`, plus the owning
+  module's errors (e.g. `PENALTY_INVALID` / `LOAN_INVALID` if the penalty or loan was paid down meanwhile)
+
+### POST `/payment-submissions/{id}/reject`
+- Permission: as approve · Body: `{ "reason": "Not on the M-Pesa statement" }` (required)
+- → `200 SubmissionView` — "Payment rejected" · Errors: as approve, `VALIDATION_FAILED` (no reason)
+
+---
+
+## 11. Expenses (`/api/v1/expenses`) · Feature `EXPENSES`
 
 Maker-checker: `PENDING_APPROVAL → APPROVED → PAID`, or `REJECTED` / `CANCELLED` before payment. Every member may view (`EXPENSE_VIEW` is a default member permission).
 
@@ -471,7 +535,7 @@ Pays an `APPROVED` expense through the ledger; the source account must hold enou
 
 ---
 
-## 11. Investments (`/api/v1/investments`) · Feature `INVESTMENTS`
+## 12. Investments (`/api/v1/investments`) · Feature `INVESTMENTS`
 
 `PROPOSED → APPROVED → ACTIVE → CLOSED`, or `REJECTED` / `CANCELLED` before funding. Every member may view.
 
@@ -530,7 +594,7 @@ Sold/redeemed; proceeds minus book value is posted as gain or loss.
 
 ---
 
-## 12. Ledger (`/api/v1/ledger`)
+## 13. Ledger (`/api/v1/ledger`)
 
 No licence feature needed. Double-entry books; entries are never edited or deleted, only reversed.
 
@@ -580,19 +644,57 @@ Posts the mirror entry dated today.
 
 ---
 
-## 13. Dashboards (`/api/v1/dashboard`)
+## 14. Dashboards (`/api/v1/dashboard`)
 
-No licence feature needed; sections for unlicensed features are `null`.
+No licence feature needed; sections for unlicensed features are `null`. Screen layouts, states and
+TypeScript types: [DASHBOARDS.md](DASHBOARDS.md).
 
 ### GET `/dashboard`
 - Permission: `REPORT_VIEW_ALL` → `200 ChamaDashboardView`
+- `keyFigures` (total contributions, contributions this year, savings, cash, loans outstanding, investments
+  market value, penalties outstanding, total assets, net worth), `members`, `cash`, `savings`, `contributions`
+  (current period, arrears, `complianceRateBasisPoints`, collected this month / year / ever), `loans` (ageing,
+  PAR30, disbursed this year, repaid, due in the next 7 days), `penalties` (owed, assessed / collected / waived
+  this year, `topOwing`), `investments` (active, market value, `totalReturnMinor`, `returnBasisPoints`, maturing
+  in 30 days), `topMembers` (5), `topInvestments` (5), `thisMonth`, `yearToDate`, `trends` (6 months, oldest
+  first), `pending` (including `paymentsAwaitingReview`), `recentEntries`.
+
+### GET `/dashboard/overview`
+The chama overview for **every member**: the same chama-wide totals as `GET /dashboard`, with nothing that
+names or singles out a member.
+- Permission: `CHAMA_VIEW` (every role by default) → `200 ChamaOverviewView`
+- `keyFigures`, `members`, `cash`, `savings`, `contributions`, `loans`, `penalties` (`topOwing` always `[]`),
+  `investments` + `topInvestments` (null without `INVESTMENT_VIEW`, as is `keyFigures.investmentsMarketValueMinor`),
+  `thisMonth`, `yearToDate`, `trends` (6 months). No `topMembers`, `pending` or `recentEntries`.
+
+### GET `/dashboard/top-members?from=&to=&limit=10`
+- Permission: `REPORT_VIEW_ALL` · Feature `CONTRIBUTIONS` → `200 TopMembersView`
+- Members ranked by contributions paid in the window (default 1 January to today, inclusive), then by
+  `complianceRateBasisPoints`. Each: `rank`, `name`, `memberNumber`, `contributedMinor`, `payments`,
+  `arrearsMinor`, `latePeriods`, `savingsMinor`. Members who paid nothing in the window are left out.
+  `limit` 1–50. `from` after `to` → `400 REPORT_INVALID_PERIOD`.
+
+### GET `/dashboard/top-investments?limit=5`
+- Permission: `INVESTMENT_VIEW` · Feature `INVESTMENTS` → `200 TopInvestmentsView`
+- Funded investments (active and closed) ranked by `returnBasisPoints`: income less expenses plus the gain in
+  value, per 10,000 invested. Each has `investmentId` (link to `/investments/{id}`), `totalReturnMinor`,
+  `annualisedReturnBasisPoints` (null under 30 days held), `daysHeld`, `profitable`.
+
+### GET `/dashboard/trends?months=12`
+- Permission: `REPORT_VIEW_ALL` → `200 TrendsView`
+- `months` 1–24, oldest first: `contributionsMinor` / `contributionPayments` (null without CONTRIBUTIONS),
+  `loansDisbursedMinor` (null without LOANS), `incomeMinor`, `expensesMinor`, `surplusMinor`.
 
 ### GET `/dashboard/me`
 - Permission: active member → `200 MemberDashboardView`
+- `netPositionMinor` (savings less loans and penalties owed), `savings`, `contributions` (with
+  `contributedYearToDateMinor`, `complianceRateBasisPoints`, `rank` of `rankOutOf`), `loans` (each loan in
+  `loans.loans` with progress and next instalment), `penalties` (each outstanding penalty), `submissions.pending`,
+  `topInvestments` (3, only with `INVESTMENT_VIEW`).
 
 ---
 
-## 14. Reports (`/api/v1/reports`) · Feature `REPORTS`
+## 15. Reports (`/api/v1/reports`) · Feature `REPORTS`
 
 All read-only, JSON only (no PDF/CSV endpoint; export client-side if needed).
 
@@ -611,7 +713,7 @@ Errors: `REPORT_INVALID_PERIOD` (`to` before `from`), `REPORT_NOT_A_CASH_ACCOUNT
 
 ---
 
-## 15. Audit log (`/api/v1/audit-log`)
+## 16. Audit log (`/api/v1/audit-log`)
 
 ### GET `/audit-log`
 - Permission: `AUDIT_LOG_VIEW` · Query: `action?` (exact match, see `KNOWN_AUDIT_ACTIONS`), `page`, `size`
@@ -619,7 +721,7 @@ Errors: `REPORT_INVALID_PERIOD` (`to` before `from`), `REPORT_NOT_A_CASH_ACCOUNT
 
 ---
 
-## 16. Opening-balance import (`/api/v1/imports/opening-balances`)
+## 17. Opening-balance import (`/api/v1/imports/opening-balances`)
 
 For a chama moving from Excel. Permission `CHAMA_SETTINGS_MANAGE` on all four. Done once per chama, all-or-nothing.
 
@@ -641,7 +743,7 @@ Checks every row; saves nothing.
 
 ---
 
-## 17. Platform administration (`/api/v1/platform/chamas`) · `ROLE_ADMIN`
+## 18. Platform administration (`/api/v1/platform/chamas`) · `ROLE_ADMIN`
 
 Platform admins log in **without** `X-Chama-Code`. They have no chama, so chama endpoints return `TENANT_REQUIRED`.
 
@@ -671,7 +773,7 @@ Renew, upgrade, suspend, reactivate. Only sent fields change.
 
 ---
 
-## 18. Operational endpoints
+## 19. Operational endpoints
 
 | Endpoint | Auth | Use |
 |---|---|---|
@@ -680,7 +782,7 @@ Renew, upgrade, suspend, reactivate. Only sent fields change.
 
 ---
 
-## 19. Errors that any endpoint can return
+## 20. Errors that any endpoint can return
 
 | HTTP | `error.code` | When | Frontend handling |
 |---|---|---|---|

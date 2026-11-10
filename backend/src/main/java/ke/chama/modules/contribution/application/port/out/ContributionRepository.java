@@ -72,4 +72,10 @@ public interface ContributionRepository {
     Map<UUID, Long> paidTotals(UUID chamaId, UUID memberUserId);
 
     Set<UUID> membersWithPayments(UUID chamaId);
+
+    /** Recorded payments paid between the two days (inclusive, null = open): member id to {total, count}. */
+    Map<UUID, long[]> paymentsByMember(UUID chamaId, LocalDate from, LocalDate to);
+
+    /** Recorded payments paid between the two days (inclusive, null = open): first day of month to {total, count}. */
+    Map<LocalDate, long[]> paymentsByMonth(UUID chamaId, LocalDate from, LocalDate to);
 }

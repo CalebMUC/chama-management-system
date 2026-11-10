@@ -280,6 +280,52 @@ class JdbcContributionRepository implements ContributionRepository {
     }
 
     @Override
+    public Map<UUID, long[]> paymentsByMember(UUID chamaId, LocalDate from, LocalDate to) {
+        Map<UUID, long[]> totals = new HashMap<>();
+        MapSqlParameterSource params = new MapSqlParameterSource("tenant", chamaId);
+        jdbc.query("""
+                        select member_user_id, sum(amount_minor) as total, count(*) as n
+                          from contribution.payments
+                         where tenant_id = :tenant and status = 'RECORDED'""" + dateRange(params, from, to) + """
+                         group by member_user_id""",
+                params,
+                rs -> {
+                    totals.put(rs.getObject("member_user_id", UUID.class), new long[]{rs.getLong("total"), rs.getLong("n")});
+                });
+        return totals;
+    }
+
+    @Override
+    public Map<LocalDate, long[]> paymentsByMonth(UUID chamaId, LocalDate from, LocalDate to) {
+        Map<LocalDate, long[]> totals = new java.util.TreeMap<>();
+        MapSqlParameterSource params = new MapSqlParameterSource("tenant", chamaId);
+        jdbc.query("""
+                        select cast(date_trunc('month', paid_on) as date) as month, sum(amount_minor) as total, count(*) as n
+                          from contribution.payments
+                         where tenant_id = :tenant and status = 'RECORDED'""" + dateRange(params, from, to) + """
+                         group by 1""",
+                params,
+                rs -> {
+                    totals.put(rs.getDate("month").toLocalDate(), new long[]{rs.getLong("total"), rs.getLong("n")});
+                });
+        return totals;
+    }
+
+    /** " and paid_on >= :from and paid_on <= :to" for whichever ends are given, with a leading and trailing space. */
+    private static String dateRange(MapSqlParameterSource params, LocalDate from, LocalDate to) {
+        StringBuilder sql = new StringBuilder(" ");
+        if (from != null) {
+            sql.append("and paid_on >= :from ");
+            params.addValue("from", Date.valueOf(from));
+        }
+        if (to != null) {
+            sql.append("and paid_on <= :to ");
+            params.addValue("to", Date.valueOf(to));
+        }
+        return sql.append('\n').toString();
+    }
+
+    @Override
     public Map<UUID, Long> paidTotals(UUID chamaId, UUID memberUserId) {
         Map<UUID, Long> totals = new HashMap<>();
         jdbc.query("""

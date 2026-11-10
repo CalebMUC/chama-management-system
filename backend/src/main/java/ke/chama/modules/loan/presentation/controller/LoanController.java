@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import ke.chama.modules.loan.application.port.in.LoanUseCases;
 import ke.chama.modules.loan.application.port.in.LoanUseCases.EligibilityView;
 import ke.chama.modules.loan.application.port.in.LoanUseCases.GuaranteeView;
+import ke.chama.modules.loan.application.port.in.LoanUseCases.GuarantorCandidate;
 import ke.chama.modules.loan.application.port.in.LoanUseCases.LoanDetailView;
 import ke.chama.modules.loan.application.port.in.LoanUseCases.LoanView;
 import ke.chama.modules.loan.application.port.in.LoanUseCases.MyLoansView;
@@ -44,6 +45,7 @@ import java.util.UUID;
  * <pre>
  * GET  /api/v1/loans/eligibility        LOAN_APPLY             ?productId= what I may borrow now
  * POST /api/v1/loans                    LOAN_APPLY             {productId, principalMinor, termMonths, purpose, guarantorUserIds}
+ * GET  /api/v1/loans/guarantor-candidates LOAN_APPLY          active members I can name as guarantors
  * GET  /api/v1/loans/me                 active member          my loans, with schedules
  * GET  /api/v1/loans/guarantees         active member          loans I was asked to guarantee
  * POST /api/v1/loans/{id}/guarantee     active member          {accept} - the guarantor's answer
@@ -93,6 +95,14 @@ class LoanController {
     @RequiresChamaPermission(ChamaPermission.LOAN_APPLY)
     ApiResponse<LoanDetailView> apply(@Valid @RequestBody ApplyRequest request) {
         return ApiResponse.ok(loans.apply(chama(), CurrentUser.id(), request.toCommand()), "Loan application submitted");
+    }
+
+    @Operation(summary = "Members I can name as guarantors",
+            description = "Every active member except me, by member number: user id, member number and name only.")
+    @GetMapping("/guarantor-candidates")
+    @RequiresChamaPermission(ChamaPermission.LOAN_APPLY)
+    ApiResponse<List<GuarantorCandidate>> guarantorCandidates() {
+        return ApiResponse.ok(loans.guarantorCandidates(chama(), CurrentUser.id()));
     }
 
     @Operation(summary = "My loans", description = "Newest first, each with its repayment schedule and repayments.")

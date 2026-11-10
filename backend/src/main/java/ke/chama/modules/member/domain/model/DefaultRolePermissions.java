@@ -27,8 +27,13 @@ public final class DefaultRolePermissions {
     public static final Set<ChamaPermission> LOCKED_FOR_CHAIRPERSON =
             Collections.unmodifiableSet(EnumSet.of(MEMBER_ROLES_MANAGE, ROLE_PERMISSIONS_MANAGE));
 
+    /**
+     * A plain member sees their own records, the chama's expenses and investments, applies for
+     * loans and reports their own payments. They do not see the member directory or the
+     * role-permission matrix (MEMBER_VIEW): those are for officials.
+     */
     private static final Set<ChamaPermission> EVERY_MEMBER = EnumSet.of(
-            CHAMA_VIEW, MEMBER_VIEW, LOAN_APPLY, EXPENSE_VIEW, INVESTMENT_VIEW);
+            CHAMA_VIEW, LOAN_APPLY, EXPENSE_VIEW, INVESTMENT_VIEW, PAYMENT_SUBMIT);
 
     private static final Map<ChamaRole, Set<ChamaPermission>> DEFAULTS = new EnumMap<>(ChamaRole.class);
 
@@ -36,19 +41,19 @@ public final class DefaultRolePermissions {
         DEFAULTS.put(ChamaRole.MEMBER, EVERY_MEMBER);
 
         DEFAULTS.put(ChamaRole.TREASURER, union(EVERY_MEMBER, EnumSet.of(
-                CONTRIBUTION_VIEW_ALL, CONTRIBUTION_RECORD, CONTRIBUTION_REVERSE,
+                MEMBER_VIEW, CONTRIBUTION_VIEW_ALL, CONTRIBUTION_RECORD, CONTRIBUTION_REVERSE,
                 LOAN_VIEW_ALL, LOAN_APPROVE, LOAN_DISBURSE, LOAN_REPAYMENT_RECORD,
                 PENALTY_VIEW_ALL, PENALTY_RECORD, EXPENSE_CREATE, INVESTMENT_MANAGE, LEDGER_VIEW, LEDGER_POST, LEDGER_ACCOUNTS_MANAGE,
                 REPORT_VIEW_ALL, PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE)));
 
         DEFAULTS.put(ChamaRole.SECRETARY, union(EVERY_MEMBER, EnumSet.of(
-                MEMBER_INVITE, CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, EXPENSE_APPROVE, INVESTMENT_APPROVE,
+                MEMBER_VIEW, MEMBER_INVITE, CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, EXPENSE_APPROVE, INVESTMENT_APPROVE,
                 REPORT_VIEW_ALL, AUDIT_LOG_VIEW, MEMBER_ACCOUNTS_VIEW_ALL)));
 
         DEFAULTS.put(ChamaRole.CHAIRPERSON, EnumSet.allOf(ChamaPermission.class));
 
         DEFAULTS.put(ChamaRole.AUDITOR, union(EVERY_MEMBER, EnumSet.of(
-                CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, LEDGER_VIEW,
+                MEMBER_VIEW, CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, LEDGER_VIEW,
                 REPORT_VIEW_ALL, AUDIT_LOG_VIEW, MEMBER_ACCOUNTS_VIEW_ALL)));
     }
 

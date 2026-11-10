@@ -64,6 +64,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -74,6 +75,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -376,6 +378,24 @@ public class ContributionService implements ContributionUseCases, LateContributi
     public StandingSnapshot standing(UUID chamaId, UUID memberUserId) {
         periods.bringUpToDate(chamaId, zone);
         return snapshot(MemberStanding.combine(List.copyOf(standingsOf(chamaId, memberUserId, rules(chamaId)).values())));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, PaymentTotal> paymentsByMember(UUID chamaId, LocalDate from, LocalDate to) {
+        Map<UUID, PaymentTotal> result = new HashMap<>();
+        repository.paymentsByMember(chamaId, from, to)
+                .forEach((member, t) -> result.put(member, new PaymentTotal(t[0], (int) t[1])));
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<YearMonth, PaymentTotal> paymentsByMonth(UUID chamaId, LocalDate from, LocalDate to) {
+        Map<YearMonth, PaymentTotal> result = new TreeMap<>();
+        repository.paymentsByMonth(chamaId, from, to)
+                .forEach((month, t) -> result.put(YearMonth.from(month), new PaymentTotal(t[0], (int) t[1])));
+        return result;
     }
 
     private static StandingSnapshot snapshot(MemberStanding s) {

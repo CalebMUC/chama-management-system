@@ -12,9 +12,9 @@ class DefaultRolePermissionsTest {
     @Test
     void ordinaryMembersSeeButDoNotTouchMoney() {
         assertThat(DefaultRolePermissions.forRole(ChamaRole.MEMBER))
-                .contains(CHAMA_VIEW, MEMBER_VIEW, LOAN_APPLY)
+                .contains(CHAMA_VIEW, LOAN_APPLY, PAYMENT_SUBMIT)
                 .doesNotContain(CONTRIBUTION_RECORD, CONTRIBUTION_VIEW_ALL, LOAN_APPROVE, EXPENSE_APPROVE,
-                        MEMBER_INVITE, AUDIT_LOG_VIEW, CHAMA_SETTINGS_MANAGE);
+                        MEMBER_VIEW, MEMBER_INVITE, AUDIT_LOG_VIEW, CHAMA_SETTINGS_MANAGE);
     }
 
     @Test

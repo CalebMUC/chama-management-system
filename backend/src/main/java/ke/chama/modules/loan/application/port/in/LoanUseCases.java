@@ -157,4 +157,13 @@ public interface LoanUseCases {
     /** A loan the member was asked to guarantee, and their answer. */
     record GuaranteeView(LoanView loan, Loan.Guarantor.Status myStatus) {
     }
+
+    /**
+     * Active members the caller may name as guarantors (everyone active except the caller), by
+     * member number. Only what a picker needs: plain members cannot list the member directory.
+     */
+    List<GuarantorCandidate> guarantorCandidates(UUID chamaId, UUID memberUserId);
+
+    record GuarantorCandidate(UUID userId, Integer memberNumber, String name) {
+    }
 }

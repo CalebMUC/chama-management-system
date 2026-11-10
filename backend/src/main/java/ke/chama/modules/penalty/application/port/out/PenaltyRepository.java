@@ -33,4 +33,11 @@ public interface PenaltyRepository {
     List<PenaltyPayment> payments(UUID chamaId, UUID penaltyId);
 
     boolean referenceExists(UUID chamaId, String method, String reference);
+
+    /**
+     * Owed now, plus assessed / collected / waived between the two days (inclusive). Waivers are
+     * dated by their time in {@code zone}, e.g. Africa/Nairobi.
+     */
+    ke.chama.modules.penalty.api.PenaltyReports.PenaltySummary summary(UUID chamaId, java.time.LocalDate from,
+                                                                       java.time.LocalDate to, String zone, int topOwing);
 }

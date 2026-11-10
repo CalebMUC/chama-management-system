@@ -288,6 +288,17 @@ public class LoanService implements LoanUseCases {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<GuarantorCandidate> guarantorCandidates(UUID chamaId, UUID memberUserId) {
+        return members.seatedMembers(chamaId).stream()
+                .filter(MemberSummary::active)
+                .filter(m -> !m.userId().equals(memberUserId))
+                .map(m -> new GuarantorCandidate(m.userId(), m.memberNumber(),
+                        name(m).isEmpty() ? m.email() : name(m)))
+                .toList();
+    }
+
     // ---- helpers --------------------------------------------------------------------------------
 
     /**

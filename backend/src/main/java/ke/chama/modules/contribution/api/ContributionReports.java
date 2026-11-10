@@ -1,7 +1,9 @@
 package ke.chama.modules.contribution.api;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -15,6 +17,24 @@ public interface ContributionReports {
 
     /** One seated member's standing across every savings product. */
     StandingSnapshot standing(UUID chamaId, UUID memberUserId);
+
+    /**
+     * Recorded (not reversed) payments paid between the two days, inclusive, per member. A null
+     * day leaves that end open. Members without payments are absent. A plain read.
+     */
+    Map<UUID, PaymentTotal> paymentsByMember(UUID chamaId, LocalDate from, LocalDate to);
+
+    /**
+     * Recorded (not reversed) payments per calendar month of the payment date, between the two
+     * days inclusive. Months without payments are absent. A plain read.
+     */
+    Map<YearMonth, PaymentTotal> paymentsByMonth(UUID chamaId, LocalDate from, LocalDate to);
+
+    /** @param count how many payments */
+    record PaymentTotal(long totalMinor, int count) {
+
+        public static final PaymentTotal NONE = new PaymentTotal(0, 0);
+    }
 
     /**
      * @param periods oldest first

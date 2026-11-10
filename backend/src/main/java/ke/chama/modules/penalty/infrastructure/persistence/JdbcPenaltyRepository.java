@@ -1,5 +1,6 @@
 package ke.chama.modules.penalty.infrastructure.persistence;
 
+import ke.chama.modules.penalty.api.PenaltyReports;
 import ke.chama.modules.penalty.application.port.out.PenaltyRepository;
 import ke.chama.modules.penalty.domain.model.Penalty;
 import ke.chama.modules.penalty.domain.model.PenaltyPayment;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -163,6 +165,44 @@ class JdbcPenaltyRepository implements PenaltyRepository {
                                         where tenant_id = :tenant and method = :method and upper(reference) = upper(:reference))""",
                 Map.of("tenant", chamaId, "method", method, "reference", reference), Boolean.class);
         return Boolean.TRUE.equals(exists);
+    }
+
+    @Override
+    public PenaltyReports.PenaltySummary summary(UUID chamaId, LocalDate from, LocalDate to, String zone, int topOwing) {
+        MapSqlParameterSource params = new MapSqlParameterSource("tenant", chamaId)
+                .addValue("from", Date.valueOf(from)).addValue("to", Date.valueOf(to)).addValue("zone", zone)
+                .addValue("top", topOwing);
+        return jdbc.queryForObject("""
+                        select
+                          coalesce(sum(amount_minor - paid_minor - waived_minor) filter (where status = 'OUTSTANDING'), 0) as owed,
+                          count(*) filter (where status = 'OUTSTANDING') as owed_count,
+                          count(distinct member_user_id) filter (where status = 'OUTSTANDING') as members_owing,
+                          coalesce(sum(amount_minor) filter (where assessed_on between :from and :to), 0) as assessed,
+                          count(*) filter (where assessed_on between :from and :to) as assessed_count,
+                          coalesce(sum(amount_minor) filter (where assessed_on between :from and :to
+                                                               and kind = 'LATE_CONTRIBUTION'), 0) as late,
+                          coalesce(sum(amount_minor) filter (where assessed_on between :from and :to and kind = 'FINE'), 0) as fines,
+                          coalesce(sum(waived_minor) filter (where waived_at is not null
+                                   and cast(waived_at at time zone :zone as date) between :from and :to), 0) as waived,
+                          (select coalesce(sum(pp.amount_minor), 0) from penalty.payments pp
+                            where pp.tenant_id = :tenant and pp.paid_on between :from and :to) as collected
+                          from penalty.penalties
+                         where tenant_id = :tenant""",
+                params,
+                (rs, i) -> new PenaltyReports.PenaltySummary(rs.getLong("owed"), rs.getInt("owed_count"),
+                        rs.getInt("members_owing"), rs.getLong("assessed"), rs.getInt("assessed_count"), rs.getLong("late"),
+                        rs.getLong("fines"), rs.getLong("collected"), rs.getLong("waived"),
+                        topOwing == 0 ? List.of() : jdbc.query("""
+                                        select member_user_id, sum(amount_minor - paid_minor - waived_minor) as owed,
+                                               count(*) as n
+                                          from penalty.penalties
+                                         where tenant_id = :tenant and status = 'OUTSTANDING'
+                                         group by member_user_id
+                                         order by owed desc, member_user_id
+                                         limit :top""",
+                                params,
+                                (r, j) -> new PenaltyReports.MemberOwing(r.getObject("member_user_id", UUID.class),
+                                        r.getLong("owed"), r.getInt("n")))));
     }
 
     private static final RowMapper<Penalty> PENALTY = (rs, i) -> new Penalty(

@@ -59,5 +59,12 @@ public enum ChamaPermission {
     /** See every member's accounts, balances and statements. */
     MEMBER_ACCOUNTS_VIEW_ALL,
     /** Open, close and reopen members' accounts in savings products. */
-    MEMBER_ACCOUNTS_MANAGE
+    MEMBER_ACCOUNTS_MANAGE,
+
+    /**
+     * Report a payment you made yourself (a contribution, a penalty payment or a loan repayment)
+     * for an official to check and record. Reviewing a report needs the matching record
+     * permission: CONTRIBUTION_RECORD, PENALTY_RECORD or LOAN_REPAYMENT_RECORD.
+     */
+    PAYMENT_SUBMIT
 }

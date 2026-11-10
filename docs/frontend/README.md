@@ -10,6 +10,7 @@ except where [§12 Known gaps](#12-known-backend-gaps-and-workarounds) says so.
 | `README.md` (this file) | Domain primer, access model, session handling, API client rules, screen-by-screen spec, UX rules, build order, acceptance checklist |
 | [`API_REFERENCE.md`](API_REFERENCE.md) | Every endpoint: method, path, permission, licence feature, body, response, error codes |
 | [`api-types.ts`](api-types.ts) | TypeScript types for every request, response and enum. Copy it into the frontend as `src/api/types.ts` |
+| [`DASHBOARDS.md`](DASHBOARDS.md) | The chama overview, member home, top members, top investments and trends screens: fields, layout, states, caching |
 
 Source of truth when in doubt: the running backend's OpenAPI document at `GET /v3/api-docs`
 (Swagger UI at `/swagger-ui.html`), and the code under `backend/src/main/java/ke/chama/modules/*/presentation`.
@@ -132,7 +133,7 @@ Default mapping for a new chama (✓ = granted):
 |---|:-:|:-:|:-:|:-:|:-:|---|
 | `CHAMA_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | Chama profile, licence |
 | `CHAMA_SETTINGS_MANAGE` | | | | ✓ | | Chama settings, opening-balance import |
-| `MEMBER_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | Member directory, roles list |
+| `MEMBER_VIEW` | | ✓ | ✓ | ✓ | ✓ | Member directory, roles list |
 | `MEMBER_INVITE` | | | ✓ | ✓ | | Invite by email |
 | `MEMBER_APPROVE` | | | | ✓ | | Approve/reject applications |
 | `MEMBER_SUSPEND` | | | | ✓ | | Suspend/reactivate |
@@ -163,6 +164,11 @@ Default mapping for a new chama (✓ = granted):
 | `PRODUCTS_MANAGE` | | ✓ | | ✓ | | Savings and loan products |
 | `MEMBER_ACCOUNTS_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | Every member's accounts |
 | `MEMBER_ACCOUNTS_MANAGE` | | ✓ | | ✓ | | Open/close/reopen accounts |
+| `PAYMENT_SUBMIT` | ✓ | ✓ | ✓ | ✓ | ✓ | Report my own contribution, penalty payment or loan repayment for the treasurer to confirm |
+
+`CHAMA_VIEW` also opens the members' chama overview (`GET /dashboard/overview`). Reviewing reported
+payments needs the matching record permission (`CONTRIBUTION_RECORD`, `PENALTY_RECORD`,
+`LOAN_REPAYMENT_RECORD`), so by default the treasurer and chairperson review them.
 
 A member's effective permissions are the union over their roles. Things that need **no**
 permission, only an ACTIVE membership: everything under "My …" (`/…/me` endpoints), loan products
@@ -559,12 +565,15 @@ Navigation groups. Show an item only if its permission and feature checks pass. 
 | | Guarantee requests | `/me/guarantees` | active member | LOANS |
 | | My penalties | `/me/penalties` | active member | PENALTIES |
 | | My statement | `/me/statement` | active member | REPORTS |
-| **Chama** | Overview (dashboard) | `/chama` | `REPORT_VIEW_ALL` | — |
+| | Report a payment | `/me/payments/new` | `PAYMENT_SUBMIT` | the paid item's feature |
+| | My reported payments | `/me/payments` | active member | — |
+| **Chama** | Overview (dashboard) | `/chama` | `CHAMA_VIEW` (`REPORT_VIEW_ALL` gets the full officials' version) | — |
 | | Members | `/members`, `/members/:userId` | `MEMBER_VIEW` | — |
 | | Expenses | `/expenses`, `/expenses/:id` | `EXPENSE_VIEW` | EXPENSES |
 | | Investments | `/investments`, `/investments/portfolio`, `/investments/:id` | `INVESTMENT_VIEW` | INVESTMENTS |
 | **Money** | Contributions | `/contributions` (payments), `/contributions/periods`, `/contributions/periods/:id`, `/contributions/standings` | `CONTRIBUTION_VIEW_ALL` | CONTRIBUTIONS |
 | | Record contribution | `/contributions/new` | `CONTRIBUTION_RECORD` | CONTRIBUTIONS |
+| | Payments to confirm | `/payment-submissions` | any of `CONTRIBUTION_RECORD`, `PENALTY_RECORD`, `LOAN_REPAYMENT_RECORD` | — |
 | | Member accounts | `/member-accounts`, `/member-accounts/:id` | `MEMBER_ACCOUNTS_VIEW_ALL` | CONTRIBUTIONS |
 | | Loans | `/loans`, `/loans/:id` | `LOAN_VIEW_ALL` | LOANS |
 | | Penalties | `/penalties`, `/penalties/:id` | `PENALTY_VIEW_ALL` | PENALTIES |
@@ -586,7 +595,7 @@ Status routes: `/pending`, `/membership-status`, `/licence-blocked`.
 
 Show a **work-queue badge** on the relevant nav items for officials, from `GET /dashboard`
 `pending` (applications, loans awaiting approval/disbursement, expenses awaiting approval/payment,
-investments awaiting approval) and for every member from `GET /dashboard/me` `loans.guaranteeRequests`.
+investments awaiting approval, `paymentsAwaitingReview` on "Payments to confirm") and for every member from `GET /dashboard/me` `loans.guaranteeRequests`.
 
 ### 6.3 Platform console
 
@@ -647,17 +656,31 @@ Name/phone/email are read-only (no update endpoint).
 ### 7.3 Member home (`/home`)
 
 Data: `GET /dashboard/me` (`MemberDashboardView`). Sections are null when unlicensed; render only non-null ones.
+Full field-by-field guide: [DASHBOARDS.md](DASHBOARDS.md#member-home-get-dashboardme).
 - Greeting with name and member number; chama name.
 - **Savings** card: `savings.totalMinor`, list of accounts (product name, account number, balance) → links to `/me/savings/:accountId`.
 - **Contributions** card: current period and its status chip, arrears (red if > 0), advance, late periods. CTA "View contributions".
 - **Loans** card: active loans, outstanding, arrears, next due date and amount; in-progress
   applications count; guarantee requests count with CTA "Respond" when > 0. CTA "Apply for a loan" if `LOAN_APPLY`.
 - **Penalties** card: outstanding amount, CTA to `/me/penalties`.
-- If the user also has `REPORT_VIEW_ALL`, show a link "Chama overview".
+- **Net position** headline: `netPositionMinor` (savings less what they owe).
+- Contributions card also shows this year's total, compliance (% from `complianceRateBasisPoints`) and
+  "Ranked {rank} of {rankOutOf}" when `rank` is not null.
+- Loans card lists `loans.loans` with a progress bar from `repaidBasisPoints`.
+- If `submissions.pending` > 0: "{n} payments awaiting confirmation".
+- If `topInvestments` is not null: a small "How our investments are doing" list.
+- A **"Report a payment"** button (`PAYMENT_SUBMIT`) → `/me/payments/new`; also on the penalties card
+  (prefilled with the penalty) and on each active loan (prefilled with the loan).
+- If the user has `CHAMA_VIEW`, show a link "Chama overview".
 
 ### 7.4 Chama overview (`/chama`)
 
-Data: `GET /dashboard` (`ChamaDashboardView`). Null sections hidden.
+Data: with `REPORT_VIEW_ALL`, `GET /dashboard` (`ChamaDashboardView`); otherwise, with `CHAMA_VIEW`,
+`GET /dashboard/overview` (`ChamaOverviewView`). The member version has the same cards minus the
+officials-only ones: no "Needs attention" panel, no top members, no "members owing most", no recent
+ledger entries, and no investment figures without `INVESTMENT_VIEW`. Render from whichever view you
+fetched and hide cards whose fields are absent or null. Null sections hidden.
+Full field-by-field guide, including the top-members, top-investments and trends screens: [DASHBOARDS.md](DASHBOARDS.md).
 - KPI row: active members (suspended, pending applications as subtext), cash total (cash on hand / bank / M-Pesa split), total savings, loans outstanding, investments market value.
 - **Needs attention** panel from `pending`: each non-zero count is a link to the filtered list
   (applications → `/members?status=PENDING_APPROVAL`; loans awaiting approval → `/loans?status=PENDING_APPROVAL`;
@@ -667,6 +690,14 @@ Data: `GET /dashboard` (`ChamaDashboardView`). Null sections hidden.
 - Loans: active, outstanding, arrears, loans in arrears, **PAR30** (% from bp; amber > 5%, red > 10%).
 - Savings per product (bar or list). Investments: active, invested, market value, income.
 - This month vs year to date: income, expenses, surplus (negative in red as deficit).
+- Headline KPIs from `keyFigures`: total contributions, net worth, total assets (null figures hidden).
+- **Top members** (`topMembers`): rank, name, contributed this year, compliance %; "See all" →
+  `GET /dashboard/top-members` with a date-range picker.
+- **Top investments** (`topInvestments`): name, return % (green profit / red loss), annualised %; each row
+  links to `/investments/:id`; "See all" → `GET /dashboard/top-investments`.
+- **Trends** chart from `trends` (contributions, income vs expenses per month); a 12/24-month toggle uses
+  `GET /dashboard/trends?months=`.
+- Penalties: owed, collected and waived this year, members owing most.
 - Recent ledger entries (`recentEntries`): number, date, description, source type chip, amount; reversal entries marked.
 - "As of {asOf}", "generated {time}". Refresh button.
 
@@ -761,7 +792,36 @@ contribution / Fine), description, amount, paid, waived, outstanding, status. He
 Record payment (`PENALTY_RECORD`; amount ≤ outstanding, method, reference, date), Waive
 (`PENALTY_WAIVE`; reason; confirm "waives KES X still outstanding").
 **Fine**: member picker (excluding self), amount, reason.
-**My penalties**: `GET /penalties/me`: total outstanding and list.
+**My penalties**: `GET /penalties/me`: total outstanding and list. Each outstanding penalty has
+"I've paid this" (`PAYMENT_SUBMIT`) → the payment report form prefilled with that penalty.
+
+### 7.8a Reported payments
+
+Members don't record payments; they **report** them and the treasurer confirms. Nothing changes on
+their balances until a report is approved, so word the UI as "awaiting confirmation", never "paid".
+
+**Report a payment** (`/me/payments/new`, `PAYMENT_SUBMIT`): `POST /payment-submissions`.
+- What for: Contribution / Penalty / Loan repayment (show only the kinds whose feature is licensed).
+  Penalty → picker of `MemberDashboardView.penalties.outstanding` (show outstanding amount);
+  Loan → picker of the member's `ACTIVE` loans (show outstanding). Cap the amount at the outstanding.
+- Amount, Method (M-Pesa / Bank / Cash), Reference (required unless Cash; "M-Pesa code" uppercased),
+  Date paid (default today, max today), Notes (≤300).
+- Errors: `SUBMISSION_DUPLICATE_REFERENCE` on the reference field; `SUBMISSION_TARGET_INVALID` → show the
+  message (it says what is outstanding). On success toast the server message and go to `/me/payments`.
+
+**My reported payments** (`/me/payments`): `GET /payment-submissions/me`. Rows: date paid, what for
+(`kind` + `targetDescription`), amount, method + reference, status chip (Pending amber, Approved green,
+Rejected red with `reviewNote`, Cancelled grey). Pending rows have **Withdraw** (`POST …/{id}/cancel`, confirm).
+Rejected rows offer "Report again" (prefilled copy).
+
+**Payments to confirm** (`/payment-submissions`, any record permission): `GET /payment-submissions`
+(defaults to every status; use a Pending tab with `status=PENDING`). Kind filter from
+`GET /payment-submissions/reviewable-kinds`. Columns: submitted, member (#, name), what for, amount,
+method + reference, date paid, notes. Actions on PENDING rows not submitted by the current user:
+**Confirm** (optional note) and **Reject** (reason required, which the member is emailed). Explain
+on Confirm that it records the payment in the books under the user's name. A user's own reports
+show "Another official must confirm this". Errors from the owning module (e.g. the penalty was paid
+down meanwhile) → show the message and refetch.
 
 ### 7.9 Loans
 
@@ -774,7 +834,8 @@ Record payment (`PENALTY_RECORD`; amount ≤ outstanding, method, reference, dat
    Live preview: interest = principal × rate (flat), total repayable, monthly instalment ≈ total ÷ term
    (label "estimate"; the server schedule is authoritative).
 4. Guarantors: required when principal > `guarantorThresholdMinor`; pick exactly
-   `guarantorsRequired` (or more, max 10) ACTIVE members, excluding yourself.
+   `guarantorsRequired` (or more, max 10) from `GET /loans/guarantor-candidates` (active members,
+   yourself excluded; plain members cannot call `GET /members`).
 5. Submit → loan detail. `LOAN_NOT_ELIGIBLE` → show the message (it lists reasons).
 
 **My loans** (`/me/loans`): `GET /loans/me`: totals; each loan card with status chip, progress

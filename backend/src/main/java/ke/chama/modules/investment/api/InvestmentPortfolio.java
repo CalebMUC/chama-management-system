@@ -20,9 +20,25 @@ public interface InvestmentPortfolio {
      * @param bookValueMinor   what the books carry it at (in the ledger's Investments account)
      * @param marketValueMinor the latest valuation, or the book value without one
      * @param incomeMinor      returns received (interest, dividends, rent)
+     * @param expensesMinor    paid expenses charged to the investment
+     * @param totalReturnMinor the profit: income less expenses, plus the gain in value (realised once
+     *                         closed, otherwise latest valuation less book value); negative for a loss
+     * @param returnBasisPoints total return per 10,000 invested (1250 = 12.5%)
+     * @param annualisedReturnBasisPoints the return per year held; null when held under 30 days
+     * @param daysHeld         from funding to closure or today
      */
     record InvestmentSnapshot(UUID id, String name, String type, String status, long investedMinor,
                               long bookValueMinor, long marketValueMinor, long incomeMinor, LocalDate fundedOn,
-                              LocalDate closedOn) {
+                              LocalDate closedOn, String institution, LocalDate maturityDate, long expensesMinor,
+                              long totalReturnMinor, int returnBasisPoints, Integer annualisedReturnBasisPoints,
+                              long daysHeld) {
+
+        public boolean active() {
+            return "ACTIVE".equals(status);
+        }
+
+        public boolean profitable() {
+            return totalReturnMinor > 0;
+        }
     }
 }

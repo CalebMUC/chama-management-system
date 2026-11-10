@@ -223,7 +223,7 @@ class ChamaMembershipIntegrationTests {
             Account member = accounts.member(chama, "Kevin");
 
             mvc.perform(member.get("/api/v1/chama")).andExpect(status().isOk());
-            mvc.perform(member.get("/api/v1/members")).andExpect(status().isOk());
+            mvc.perform(member.get("/api/v1/members")).andExpect(status().isForbidden());   // the directory is for officials
             mvc.perform(member.put("/api/v1/chama/settings", standardSettingsJson()))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));

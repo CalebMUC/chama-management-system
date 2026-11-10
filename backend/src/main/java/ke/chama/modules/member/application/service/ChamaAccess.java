@@ -1,6 +1,7 @@
 package ke.chama.modules.member.application.service;
 
 import ke.chama.shared.tenancy.TenantContext;
+import ke.chama.modules.member.api.MemberPermissions;
 import ke.chama.modules.member.application.port.out.MembershipRepository;
 import ke.chama.modules.member.application.port.out.RolePermissionRepository;
 import ke.chama.modules.member.domain.model.MembershipStatus;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -22,7 +24,7 @@ import java.util.UUID;
  */
 @Component("chamaAccess")
 @Transactional(readOnly = true)
-public class ChamaAccess {
+public class ChamaAccess implements MemberPermissions {
 
     private final RolePermissionRepository rolePermissions;
     private final MembershipRepository memberships;
@@ -41,6 +43,21 @@ public class ChamaAccess {
         }
         return rolePermissions.effectivePermissions(chamaId.get(), user.get().userId())
                 .contains(ChamaPermission.valueOf(permission));
+    }
+
+    /** The caller holds at least one of {@code permissions}. */
+    public boolean hasAny(String... permissions) {
+        for (String permission : permissions) {
+            if (has(permission)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public Set<ChamaPermission> permissionsOf(UUID chamaId, UUID userId) {
+        return rolePermissions.effectivePermissions(chamaId, userId);
     }
 
     public boolean isActiveMember() {

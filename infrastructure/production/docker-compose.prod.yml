@@ -56,6 +56,8 @@ services:
       # Redis and RabbitMQ are on the classpath but unused and not deployed: without these, health reports DOWN.
       MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
       MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
+      # false while there is no mail server yet: otherwise health reports DOWN (503) and deploys fail their check.
+      MANAGEMENT_HEALTH_MAIL_ENABLED: ${MAIL_HEALTH_CHECK:-true}
       # application.yaml logs ke.chama at DEBUG.
       LOGGING_LEVEL_KE_CHAMA: INFO
     depends_on:

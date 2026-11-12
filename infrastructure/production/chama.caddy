@@ -1,0 +1,36 @@
+chama.mokicainvestments.co.ke {
+	encode zstd gzip
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+	}
+
+	# The API. 8 MB covers the 6 MB opening-balance upload limit.
+	handle /api/v1/* {
+		request_body {
+			max_size 8MB
+		}
+		reverse_proxy chama-api:8080
+	}
+
+	# Only health is public; metrics and the rest of /actuator stay inside Docker.
+	handle /actuator/health* {
+		reverse_proxy chama-api:8080
+	}
+	handle /actuator/* {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy chama-web:3000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -1,0 +1,95 @@
+# The Chama production stack: PostgreSQL, the Spring Boot API and the Next.js frontend.
+# Run it through ./chama.sh, which passes /opt/chama/.env (three folders up from here):
+#   ./chama.sh build chama-api     build one image at a time: chama-api, then chama-web
+#   ./chama.sh up -d               start or restart everything that changed (Flyway migrates at API start-up)
+#   ./chama.sh logs -f chama-api   follow the API's log
+# No public ports: the POS stack's Caddy is the only way in (see chama.caddy).
+name: chama
+
+services:
+  chama-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "effective_cache_size=384MB", "-c", "work_mem=4MB"]
+    shm_size: 128mb
+    mem_limit: 512m
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env}
+      # Read by postgres-init/01-owner.sh on the very first start only.
+      CHAMA_DB_PASSWORD: ${CHAMA_DB_PASSWORD:?set CHAMA_DB_PASSWORD in .env}
+    volumes:
+      - chama_pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d chama_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  chama-api:
+    image: chama-api:latest
+    build:
+      context: ../../backend
+    restart: unless-stopped
+    # The image sets MaxRAMPercentage=75: about 576 MB of heap.
+    mem_limit: 768m
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://chama-db:5432/chama_db
+      DB_USERNAME: chama_owner
+      DB_PASSWORD: ${CHAMA_DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      FRONTEND_BASE_URL: https://${CHAMA_ADDRESS:?set CHAMA_ADDRESS in .env}
+      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
+      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
+      MAIL_HOST: ${MAIL_HOST:?set MAIL_HOST in .env}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-true}
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
+      # Caddy is the only way in: trust its X-Forwarded-For, so login lockout and the audit log see the real address.
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      # Redis and RabbitMQ are on the classpath but unused and not deployed: without these, health reports DOWN.
+      MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
+      MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
+      # application.yaml logs ke.chama at DEBUG.
+      LOGGING_LEVEL_KE_CHAMA: INFO
+    depends_on:
+      chama-db:
+        condition: service_healthy
+    # Exactly one: the nightly penalty job would run twice.
+    networks: [internal, edge]
+
+  chama-web:
+    image: chama-web:latest
+    build:
+      context: ../../../frontend
+      args:
+        # Fixed into the frontend when it is built: change them, then ./chama.sh build chama-web.
+        NEXT_PUBLIC_API_BASE_URL: /api/v1
+        NEXT_PUBLIC_APP_ENV: production
+        NEXT_PUBLIC_IDLE_TIMEOUT_MINUTES: ${IDLE_TIMEOUT_MINUTES:-15}
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${SUPPORT_EMAIL:-}
+        NEXT_PUBLIC_SUPPORT_PHONE: ${SUPPORT_PHONE:-}
+        API_PROXY_TARGET: http://chama-api:8080
+    environment:
+      API_PROXY_TARGET: http://chama-api:8080
+    restart: unless-stopped
+    mem_limit: 384m
+    networks: [edge]
+
+networks:
+  internal:
+    name: chama_internal
+  # The POS stack's network, where its Caddy runs. Created by the POS stack: start that first.
+  edge:
+    name: ultimatepos_default
+    external: true
+
+volumes:
+  chama_pgdata:
+    name: chama_pgdata

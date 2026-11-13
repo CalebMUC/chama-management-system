@@ -76,4 +76,18 @@ public interface PaymentSubmissionUseCases {
 
     /** The kinds of payment the caller may review, for a client to label its queue. */
     List<PaymentSubmission.Kind> reviewableKinds(UUID chamaId, UUID officialUserId);
+
+    /**
+     * Pending reports this official can act on, for a nav badge: only the kinds they may review,
+     * and not their own reports (someone else must review those).
+     */
+    ReviewCounts reviewCounts(UUID chamaId, UUID officialUserId);
+
+    /** Per kind; a kind the official may not review is 0. {@code total} is their sum. */
+    record ReviewCounts(long contributions, long penaltyPayments, long loanRepayments, long total) {
+
+        public ReviewCounts(long contributions, long penaltyPayments, long loanRepayments) {
+            this(contributions, penaltyPayments, loanRepayments, contributions + penaltyPayments + loanRepayments);
+        }
+    }
 }

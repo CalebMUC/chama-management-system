@@ -188,6 +188,15 @@ class PaymentSubmissionIntegrationTests {
         mvc.perform(chama.treasurer().post("/api/v1/payment-submissions/{id}/approve", own))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("SUBMISSION_SELF_REVIEW"));
+
+        // Badge counts: the treasurer's own report is not theirs to act on; the chair sees both.
+        mvc.perform(chama.treasurer().get("/api/v1/payment-submissions/pending-count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.contributions").value(1))
+                .andExpect(jsonPath("$.data.total").value(1));
+        mvc.perform(chama.chair().get("/api/v1/payment-submissions/pending-count"))
+                .andExpect(jsonPath("$.data.contributions").value(2));
+        mvc.perform(member.get("/api/v1/payment-submissions/pending-count")).andExpect(status().isForbidden());
         mvc.perform(chama.chair().post("/api/v1/payment-submissions/{id}/approve", own))
                 .andExpect(status().isOk());
     }

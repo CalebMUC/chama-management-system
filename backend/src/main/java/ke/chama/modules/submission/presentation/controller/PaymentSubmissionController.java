@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.submission.application.port.in.PaymentSubmissionUseCases;
+import ke.chama.modules.submission.application.port.in.PaymentSubmissionUseCases.ReviewCounts;
 import ke.chama.modules.submission.application.port.in.PaymentSubmissionUseCases.SubmissionView;
 import ke.chama.modules.submission.domain.model.PaymentSubmission;
 import ke.chama.modules.submission.presentation.dto.request.SubmissionRequests.ApproveSubmissionRequest;
@@ -40,6 +41,7 @@ import java.util.UUID;
  * POST /api/v1/payment-submissions/{id}/cancel      active member    the submitter withdraws a pending report
  * GET  /api/v1/payment-submissions                  any record perm  ?status=&kind=&memberUserId=&page=&size=  the review queue
  * GET  /api/v1/payment-submissions/reviewable-kinds any record perm  the kinds I may review
+ * GET  /api/v1/payment-submissions/pending-count    any record perm  pending reports I can act on (not my own), for a badge
  * GET  /api/v1/payment-submissions/{id}             submitter or reviewer of its kind
  * POST /api/v1/payment-submissions/{id}/approve     record perm of its kind  {note}: records the real payment
  * POST /api/v1/payment-submissions/{id}/reject      record perm of its kind  {reason}
@@ -116,6 +118,16 @@ class PaymentSubmissionController {
     @PreAuthorize(ANY_REVIEWER)
     ApiResponse<List<PaymentSubmission.Kind>> reviewableKinds() {
         return ApiResponse.ok(submissions.reviewableKinds(chama(), CurrentUser.id()));
+    }
+
+    @Operation(summary = "How many reports I can act on",
+            description = """
+                    Pending reports of the kinds I may review, excluding my own (another official reviews those). \
+                    For a nav badge; needs no REPORT_VIEW_ALL.""")
+    @GetMapping("/pending-count")
+    @PreAuthorize(ANY_REVIEWER)
+    ApiResponse<ReviewCounts> pendingCount() {
+        return ApiResponse.ok(submissions.reviewCounts(chama(), CurrentUser.id()));
     }
 
     @Operation(summary = "One reported payment", description = "To its submitter, or an official who may review its kind.")

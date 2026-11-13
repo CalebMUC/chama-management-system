@@ -510,6 +510,12 @@ The review queue: only the kinds the caller may review. Pending ones first (olde
 ### GET `/payment-submissions/reviewable-kinds`
 - Permission: as the queue → `200 SubmissionKind[]` (for the queue's kind filter)
 
+### GET `/payment-submissions/pending-count`
+For the "Payments to confirm" nav badge. Pending reports of the kinds the caller may review, **excluding their
+own** (another official reviews those). Works without `REPORT_VIEW_ALL`, unlike `GET /dashboard` `pending`.
+- Permission: as the queue → `200 SubmissionReviewCounts` `{ contributions, penaltyPayments, loanRepayments, total }`
+  (a kind the caller may not review is `0`)
+
 ### GET `/payment-submissions/{id}`
 - Permission: the submitter, or an official who may review its kind → `200 SubmissionView`
 - Errors: `SUBMISSION_NOT_FOUND`, `ACCESS_DENIED`

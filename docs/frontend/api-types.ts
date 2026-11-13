@@ -969,6 +969,17 @@ export interface SubmitPaymentRequest {
   notes?: string;
 }
 
+/**
+ * GET /payment-submissions/pending-count: pending reports the caller can act on (their reviewable
+ * kinds, not their own reports). Use for the nav badge.
+ */
+export interface SubmissionReviewCounts {
+  contributions: number;
+  penaltyPayments: number;
+  loanRepayments: number;
+  total: number;
+}
+
 /** POST /payment-submissions/{id}/approve (body optional) */
 export interface ApproveSubmissionRequest {
   note?: string;

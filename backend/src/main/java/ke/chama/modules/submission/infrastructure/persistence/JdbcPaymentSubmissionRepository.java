@@ -122,11 +122,25 @@ class JdbcPaymentSubmissionRepository implements PaymentSubmissionRepository {
 
     @Override
     public Map<PaymentSubmission.Kind, Long> pendingByKind(UUID chamaId) {
+        return pendingCounts(chamaId, null);
+    }
+
+    @Override
+    public Map<PaymentSubmission.Kind, Long> pendingByKindExcluding(UUID chamaId, UUID excludedMemberUserId) {
+        return pendingCounts(chamaId, excludedMemberUserId);
+    }
+
+    private Map<PaymentSubmission.Kind, Long> pendingCounts(UUID chamaId, UUID excludedMemberUserId) {
         Map<PaymentSubmission.Kind, Long> counts = new EnumMap<>(PaymentSubmission.Kind.class);
-        jdbc.query("""
-                        select kind, count(*) as n from submission.payment_submissions
-                         where tenant_id = :tenant and status = 'PENDING' group by kind""",
-                Map.of("tenant", chamaId),
+        MapSqlParameterSource params = new MapSqlParameterSource("tenant", chamaId);
+        String excluding = "";
+        if (excludedMemberUserId != null) {
+            excluding = " and member_user_id <> :excluded";
+            params.addValue("excluded", excludedMemberUserId);
+        }
+        jdbc.query("select kind, count(*) as n from submission.payment_submissions"
+                        + " where tenant_id = :tenant and status = 'PENDING'" + excluding + " group by kind",
+                params,
                 rs -> {
                     counts.put(PaymentSubmission.Kind.valueOf(rs.getString("kind")), rs.getLong("n"));
                 });

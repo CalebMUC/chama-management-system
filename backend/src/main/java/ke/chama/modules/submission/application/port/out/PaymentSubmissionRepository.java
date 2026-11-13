@@ -31,5 +31,8 @@ public interface PaymentSubmissionRepository {
 
     Map<PaymentSubmission.Kind, Long> pendingByKind(UUID chamaId);
 
+    /** Pending per kind, leaving out {@code excludedMemberUserId}'s own reports. */
+    Map<PaymentSubmission.Kind, Long> pendingByKindExcluding(UUID chamaId, UUID excludedMemberUserId);
+
     long pendingOf(UUID chamaId, UUID memberUserId);
 }

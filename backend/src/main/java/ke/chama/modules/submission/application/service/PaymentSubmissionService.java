@@ -210,6 +210,16 @@ public class PaymentSubmissionService implements PaymentSubmissionUseCases, Paym
 
     @Override
     @Transactional(readOnly = true)
+    public ReviewCounts reviewCounts(UUID chamaId, UUID officialUserId) {
+        List<Kind> reviewable = reviewableKinds(chamaId, officialUserId);
+        Map<Kind, Long> counts = repository.pendingByKindExcluding(chamaId, officialUserId);
+        Function<Kind, Long> count = k -> reviewable.contains(k) ? counts.getOrDefault(k, 0L) : 0L;
+        return new ReviewCounts(count.apply(Kind.CONTRIBUTION), count.apply(Kind.PENALTY_PAYMENT),
+                count.apply(Kind.LOAN_REPAYMENT));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PendingCounts pending(UUID chamaId) {
         Map<Kind, Long> counts = repository.pendingByKind(chamaId);
         return new PendingCounts(counts.getOrDefault(Kind.CONTRIBUTION, 0L),

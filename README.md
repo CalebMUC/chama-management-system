@@ -344,9 +344,9 @@ The API has no CORS configuration; serve a browser frontend from the same origin
 | Level | Roles | Where it applies |
 |-------|-------|------------------|
 | Platform | `ROLE_ADMIN` (platform administrator), `ROLE_USER` | `/api/v1/platform/**`: onboarding chamas, licences |
-| Chama | `MEMBER`, `TREASURER`, `SECRETARY`, `CHAIRPERSON`, `AUDITOR` (a member can hold several) | Everything inside a chama |
+| Chama | `MEMBER`, `TREASURER`, `SECRETARY`, `CHAIRPERSON`, `AUDITOR`, `ADMIN` (a member can hold several) | Everything inside a chama |
 
-Endpoints check **permissions**, never role names. Each chama starts with a default role → permission mapping (treasurer records money, secretary handles membership and approves spending, chairperson can do everything, auditor sees everything and changes nothing) and the chairperson can re-map it. Permissions are read from the database on every request, so suspensions and role changes apply immediately. Viewing your own records needs only an active membership.
+Endpoints check **permissions**, never role names. Each chama starts with a default role → permission mapping (treasurer records money, secretary handles membership and approves spending, chairperson can do everything, auditor sees everything and changes nothing, admin runs operations such as members, roles, settings and products without touching money) and the chairperson can re-map it. Permissions are read from the database on every request, so suspensions and role changes apply immediately. Viewing your own records needs only an active membership.
 
 **Sessions:** JWT access tokens expire after **15 minutes**. Refresh tokens last **7 days**, are stored hashed in PostgreSQL, and rotate on every use; presenting an already-used refresh token revokes all of the user's sessions. Five failed logins within 15 minutes lock the email for 15 minutes. Passwords are BCrypt-hashed (8–72 characters, a letter and a digit).
 

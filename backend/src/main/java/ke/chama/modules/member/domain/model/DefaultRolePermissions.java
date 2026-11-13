@@ -16,7 +16,8 @@ import static ke.chama.shared.security.ChamaPermission.*;
  * <p>
  * Built for separation of duties: the treasurer records money and creates expenses; the
  * chairperson and secretary approve expenses and investments (two approvers, for the default
- * quorum of two); the secretary handles membership; the auditor sees everything and changes nothing.
+ * quorum of two); the secretary handles membership; the auditor sees everything and changes nothing;
+ * the admin runs operations (members, roles, settings, products) without touching money.
  */
 public final class DefaultRolePermissions {
 
@@ -55,6 +56,14 @@ public final class DefaultRolePermissions {
         DEFAULTS.put(ChamaRole.AUDITOR, union(EVERY_MEMBER, EnumSet.of(
                 MEMBER_VIEW, CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, LEDGER_VIEW,
                 REPORT_VIEW_ALL, AUDIT_LOG_VIEW, MEMBER_ACCOUNTS_VIEW_ALL)));
+
+        // Operations, not money: the admin manages members, their roles, settings and products,
+        // but records, approves and disburses nothing. Changing what a role may do
+        // (ROLE_PERMISSIONS_MANAGE) stays with the chairperson, so the admin cannot widen its own powers.
+        DEFAULTS.put(ChamaRole.ADMIN, union(EVERY_MEMBER, EnumSet.of(
+                CHAMA_SETTINGS_MANAGE, MEMBER_VIEW, MEMBER_INVITE, MEMBER_APPROVE, MEMBER_SUSPEND, MEMBER_ROLES_MANAGE,
+                CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, REPORT_VIEW_ALL, AUDIT_LOG_VIEW,
+                PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE)));
     }
 
     private DefaultRolePermissions() {

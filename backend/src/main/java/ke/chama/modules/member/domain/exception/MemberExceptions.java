@@ -23,6 +23,14 @@ public final class MemberExceptions {
         }
     }
 
+    /** One identity document belongs to one member of a chama. */
+    public static class IdDocumentTakenException extends DomainException {
+        public IdDocumentTakenException() {
+            super("MEMBER_ID_NUMBER_TAKEN", ErrorType.CONFLICT,
+                    "Another member of this chama is already registered with this ID document");
+        }
+    }
+
     /** Accountability: nobody changes their own roles or status; another official must. */
     public static class SelfManagementNotAllowedException extends DomainException {
         public SelfManagementNotAllowedException() {

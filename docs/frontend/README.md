@@ -134,7 +134,7 @@ Default mapping for a new chama (✓ = granted):
 | `CHAMA_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Chama profile, licence |
 | `CHAMA_SETTINGS_MANAGE` | | | | ✓ | | ✓ | Chama settings, opening-balance import |
 | `MEMBER_VIEW` | | ✓ | ✓ | ✓ | ✓ | ✓ | Member directory, roles list |
-| `MEMBER_INVITE` | | | ✓ | ✓ | | ✓ | Invite by email |
+| `MEMBER_INVITE` | | | ✓ | ✓ | | ✓ | Add members directly, invite by email, keep KYC details |
 | `MEMBER_APPROVE` | | | | ✓ | | ✓ | Approve/reject applications |
 | `MEMBER_SUSPEND` | | | | ✓ | | ✓ | Suspend/reactivate |
 | `MEMBER_ROLES_MANAGE` | | | | ✓ | | ✓ | Change a member's roles |
@@ -317,6 +317,11 @@ today in Nairobi when omitted; set the date picker's `max` to today in Nairobi.
 - `TENANT_NOT_FOUND` → error on the chama-code field.
 - `AUTH_ACCOUNT_LOCKED` → show message and a countdown from `retryAfterSeconds`; offer "Forgot password?".
 - `AUTH_ACCOUNT_DISABLED`, `AUTH_EMAIL_NOT_VERIFIED` → show message; for the latter offer "Resend verification email".
+
+A member an official added (`POST /members`) signs in with the temporary password they were given. `GET /auth/me` then
+has `mustChangePassword: true`: go straight to `/change-password` (current = temporary password, new, confirm) and
+call nothing else; the API answers `403 AUTH_PASSWORD_CHANGE_REQUIRED` to everything but `/auth/me`, the password
+change and sign-out. After `POST /auth/password/change`, store the returned tokens and reload the context (§5).
 
 **Platform admin login** (`/admin/login`): Email, Password, **no** chama header. After login,
 `/auth/me` must show `ROLE_ADMIN`; otherwise log out and show "This sign-in is for platform administrators".
@@ -504,6 +509,7 @@ App load
  └─ Stored session
      ├─ refresh token expired ─► clear ─────────────────────────► /login
      └─ GET /auth/me  (refreshes first if the access token is stale)
+         ├─ mustChangePassword ─────────────────────────────────► /change-password
          ├─ roles ∋ ROLE_ADMIN and chamaId = null ──────────────► /platform
          └─ chama user ─► GET /members/me
              ├─ status PENDING_APPROVAL ────────────────────────► /pending
@@ -595,7 +601,7 @@ Navigation groups. Show an item only if its permission and feature checks pass. 
 | **Account** (user menu) | Profile & security | `/profile` | any signed-in user | — |
 | | Sign out / sign out everywhere | — | — | — |
 
-Status routes: `/pending`, `/membership-status`, `/licence-blocked`.
+Status routes: `/pending`, `/membership-status`, `/licence-blocked`, `/change-password`.
 
 Show a **work-queue badge** on the relevant nav items for officials, from `GET /dashboard`
 `pending` (applications, loans awaiting approval/disbursement, expenses awaiting approval/payment,
@@ -724,8 +730,16 @@ Row actions (show when allowed and the state fits; never on the user's own row):
 
 Errors to handle: `MEMBER_SELF_MANAGEMENT`, `MEMBER_LAST_CHAIRPERSON`, `MEMBER_INVALID_STATE` (refetch).
 
-**Invite** button (`MEMBER_INVITE`): email → `POST /members/invitations`; toast with the server message.
+**Add member** button (`MEMBER_INVITE`): `POST /members`. Sections: Personal details (first name, last name, email,
+phone), Identification (ID document type, number, date of birth ≥ 18 years ago, gender), Address (county from the 47
+counties, town, physical address) and Sign-in (temporary password, with Show and Generate). On success show the chama
+code, email and temporary password once, with a copy button: nothing is emailed and the password cannot be read again.
+
+**Invite by email** button (`MEMBER_INVITE`): email → `POST /members/invitations`; toast with the server message.
 Also show the chama code with a copy button and a shareable join link `{origin}/join?chama={code}`.
+
+**KYC details** panel on the member detail: `GET /members/{membershipId}/kyc` (`null` → "none recorded"); Add/Edit
+(`MEMBER_INVITE`) → `PUT /members/{membershipId}/kyc` with the same Identification and Address fields.
 
 **Member detail** (`/members/:userId`): there is no single-member endpoint; take the row from the
 cached list. Tabs, each shown only with its permission:

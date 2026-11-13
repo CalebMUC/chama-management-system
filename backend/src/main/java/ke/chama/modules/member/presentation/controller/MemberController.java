@@ -3,13 +3,16 @@ package ke.chama.modules.member.presentation.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import ke.chama.modules.member.application.port.in.MemberViews.InvitationView;
+import ke.chama.modules.member.application.port.in.MemberViews.MemberKycView;
 import ke.chama.modules.member.application.port.in.MemberViews.MemberView;
 import ke.chama.modules.member.application.port.in.MemberViews.MyMembershipView;
 import ke.chama.modules.member.application.port.in.MembershipCommands;
 import ke.chama.modules.member.application.port.in.MembershipQueries;
 import ke.chama.modules.member.domain.model.MembershipStatus;
+import ke.chama.modules.member.presentation.dto.request.MemberRequests.AddMemberRequest;
 import ke.chama.modules.member.presentation.dto.request.MemberRequests.ChangeRolesRequest;
 import ke.chama.modules.member.presentation.dto.request.MemberRequests.InviteMemberRequest;
+import ke.chama.modules.member.presentation.dto.request.MemberRequests.KycRequest;
 import ke.chama.modules.member.presentation.dto.request.MemberRequests.SuspendMemberRequest;
 import ke.chama.shared.security.ChamaPermission;
 import ke.chama.shared.security.CurrentUser;
@@ -35,7 +38,11 @@ import java.util.UUID;
 /**
  * Members of the caller's chama (the tenant of their access token).
  * <pre>
+ * POST /api/v1/members                      MEMBER_INVITE        {firstName, lastName, email, phoneNumber,
+ *                                                                  temporaryPassword, kyc}  adds an ACTIVE member
  * POST /api/v1/members/invitations          MEMBER_INVITE        {email}   emails a join link
+ * GET  /api/v1/members/{id}/kyc             MEMBER_VIEW          null when none was recorded
+ * PUT  /api/v1/members/{id}/kyc             MEMBER_INVITE        {idType, idNumber, dateOfBirth, gender, county, ...}
  * POST /api/v1/members/{id}/approve         MEMBER_APPROVE
  * POST /api/v1/members/{id}/reject          MEMBER_APPROVE
  * POST /api/v1/members/{id}/suspend         MEMBER_SUSPEND       {reason}
@@ -58,6 +65,27 @@ class MemberController {
     MemberController(MembershipCommands commands, MembershipQueries queries) {
         this.commands = commands;
         this.queries = queries;
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequiresChamaPermission(ChamaPermission.MEMBER_INVITE)
+    ApiResponse<MemberView> add(@Valid @RequestBody AddMemberRequest request) {
+        return ApiResponse.ok(commands.addMember(chama(), CurrentUser.id(), request.toCommand()),
+                "Member added. Give them the temporary password; they choose their own when they first sign in.");
+    }
+
+    @GetMapping("/{membershipId}/kyc")
+    @RequiresChamaPermission(ChamaPermission.MEMBER_VIEW)
+    ApiResponse<MemberKycView> kyc(@PathVariable UUID membershipId) {
+        return ApiResponse.ok(queries.kyc(chama(), membershipId).orElse(null));
+    }
+
+    @PutMapping("/{membershipId}/kyc")
+    @RequiresChamaPermission(ChamaPermission.MEMBER_INVITE)
+    ApiResponse<MemberKycView> updateKyc(@PathVariable UUID membershipId, @Valid @RequestBody KycRequest request) {
+        return ApiResponse.ok(commands.updateKyc(chama(), membershipId, CurrentUser.id(), request.toKyc()),
+                "KYC details saved");
     }
 
     @PostMapping("/invitations")

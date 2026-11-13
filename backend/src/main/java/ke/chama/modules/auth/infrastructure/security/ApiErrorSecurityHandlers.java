@@ -53,7 +53,7 @@ class ApiErrorSecurityHandlers implements AuthenticationEntryPoint, AccessDenied
         write(request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", ApiError.defaultMessage(HttpStatus.FORBIDDEN));
     }
 
-    private void write(HttpServletRequest request, HttpServletResponse response, HttpStatus status,
+    void write(HttpServletRequest request, HttpServletResponse response, HttpStatus status,
                        String code, String message) throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

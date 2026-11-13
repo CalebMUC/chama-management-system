@@ -2,11 +2,15 @@ package ke.chama.modules.member.application.port.in;
 
 import ke.chama.modules.auth.api.UserSummary;
 import ke.chama.modules.member.domain.model.ChamaRole;
+import ke.chama.modules.member.domain.model.Gender;
+import ke.chama.modules.member.domain.model.IdDocumentType;
+import ke.chama.modules.member.domain.model.MemberKyc;
 import ke.chama.modules.member.domain.model.Membership;
 import ke.chama.modules.member.domain.model.MembershipStatus;
 import ke.chama.shared.security.ChamaPermission;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
@@ -55,5 +59,23 @@ public final class MemberViews {
      * then approved like any other applicant.
      */
     public record InvitationView(String email, String chamaCode, Instant invitedAt) {
+    }
+
+    /** A member's KYC details. {@code town} and {@code physicalAddress} may be null. */
+    public record MemberKycView(UUID membershipId,
+                                IdDocumentType idType,
+                                String idNumber,
+                                LocalDate dateOfBirth,
+                                Gender gender,
+                                String county,
+                                String town,
+                                String physicalAddress,
+                                UUID updatedBy,
+                                Instant updatedAt) {
+
+        public static MemberKycView of(UUID membershipId, MemberKyc kyc, UUID updatedBy, Instant updatedAt) {
+            return new MemberKycView(membershipId, kyc.idType(), kyc.idNumber(), kyc.dateOfBirth(), kyc.gender(),
+                    kyc.county(), kyc.town(), kyc.physicalAddress(), updatedBy, updatedAt);
+        }
     }
 }

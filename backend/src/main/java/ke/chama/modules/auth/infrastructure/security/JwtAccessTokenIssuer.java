@@ -18,7 +18,7 @@ import java.util.UUID;
 
 /**
  * Access token claims: {@code sub} (user id), {@code email}, {@code email_verified}, {@code roles} (platform roles),
- * {@code iss}, {@code iat}, {@code exp}, {@code jti}.
+ * {@code pwd_change_required}, {@code iss}, {@code iat}, {@code exp}, {@code jti}.
  * <p>
  * Chama permissions are deliberately left out. They are looked up per request (Phase 2), so
  * removing a treasurer takes effect immediately instead of when the token expires.
@@ -30,6 +30,8 @@ class JwtAccessTokenIssuer implements AccessTokenIssuer {
     /** Standard OIDC claim name. */
     static final String EMAIL_VERIFIED_CLAIM = "email_verified";
     static final String ROLES_CLAIM = "roles";
+    /** True while the password is a temporary one; see {@link PasswordChangeRequiredFilter}. */
+    static final String PASSWORD_CHANGE_REQUIRED_CLAIM = "pwd_change_required";
 
     private final JwtEncoder encoder;
     private final AuthProperties properties;
@@ -51,6 +53,7 @@ class JwtAccessTokenIssuer implements AccessTokenIssuer {
                 .claim(EMAIL_CLAIM, user.getEmail())
                 .claim(EMAIL_VERIFIED_CLAIM, user.isEmailVerified())
                 .claim(ROLES_CLAIM, user.getRoles().stream().map(Role::getName).sorted().toList())
+                .claim(PASSWORD_CHANGE_REQUIRED_CLAIM, user.isMustChangePassword())
                 // The tenant always comes from the user record, never from the request.
                 .claim(TenantContextFilter.TENANT_ID_CLAIM, user.getTenantId().toString())
                 .claims(c -> TenantContext.code()

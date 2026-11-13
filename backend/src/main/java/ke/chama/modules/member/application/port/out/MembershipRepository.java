@@ -14,6 +14,9 @@ public interface MembershipRepository {
 
     Membership save(Membership membership);
 
+    /** Saves and writes the row now, for a plain-SQL insert that references it in the same transaction. */
+    Membership saveAndFlush(Membership membership);
+
     Optional<Membership> findByIdAndChamaId(UUID id, UUID chamaId);
 
     Optional<Membership> findByChamaIdAndUserId(UUID chamaId, UUID userId);

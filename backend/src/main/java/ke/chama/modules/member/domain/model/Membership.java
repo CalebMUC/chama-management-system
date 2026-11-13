@@ -111,6 +111,19 @@ public class Membership extends AggregateRoot {
         return membership;
     }
 
+    /**
+     * An official opened the member's account directly: active from now, with the next member
+     * number. Roles beyond MEMBER are given afterwards, like for any member.
+     */
+    public static Membership added(UUID chamaId, UUID userId, String email, int memberNumber, UUID addedBy, Instant now) {
+        Membership membership = new Membership(chamaId, userId, email, MembershipStatus.ACTIVE, now);
+        membership.memberNumber = memberNumber;
+        membership.joinedAt = now;
+        membership.decidedBy = addedBy;
+        membership.decidedAt = now;
+        return membership;
+    }
+
     /** Someone registered with the chama's code: they wait for an official's approval. */
     public static Membership application(UUID chamaId, UUID userId, String email, Instant now) {
         return new Membership(chamaId, userId, email, MembershipStatus.PENDING_APPROVAL, now);

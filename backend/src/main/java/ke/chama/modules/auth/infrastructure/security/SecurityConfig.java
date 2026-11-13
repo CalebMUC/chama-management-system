@@ -75,7 +75,9 @@ class SecurityConfig {
                         .authenticationEntryPoint(handlers)
                         .accessDeniedHandler(handlers))
                 // Right after the access token is validated, so the tenant is taken from the token.
-                .addFilterAfter(new TenantContextFilter(tenantResolver), BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(new TenantContextFilter(tenantResolver), BearerTokenAuthenticationFilter.class)
+                // A temporary password set by an official: nothing but changing it until it is changed.
+                .addFilterAfter(new PasswordChangeRequiredFilter(handlers), TenantContextFilter.class);
 
         return http.build();
     }

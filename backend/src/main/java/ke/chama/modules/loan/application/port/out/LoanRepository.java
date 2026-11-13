@@ -43,4 +43,20 @@ public interface LoanRepository {
 
     /** Whether a disbursement or repayment already used this M-Pesa code or bank slip. */
     boolean referenceExists(UUID chamaId, String method, String reference);
+
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    /** Tags loans and repayments as created by an import batch. */
+    void markImported(UUID chamaId, java.util.Collection<UUID> loanIds, java.util.Collection<UUID> repaymentIds, UUID batchId);
+
+    List<Loan> importedLoans(UUID chamaId, UUID batchId);
+
+    /** Repayments on the batch's loans that the batch did not create (recorded by hand since). */
+    long laterRepayments(UUID chamaId, UUID batchId);
+
+    /** Deletes the batch's loans and their repayments. */
+    void deleteImported(UUID chamaId, UUID batchId);
+
+    /** References of disbursements and repayments, as METHOD:REFERENCE upper case. */
+    Set<String> usedReferences(UUID chamaId);
 }

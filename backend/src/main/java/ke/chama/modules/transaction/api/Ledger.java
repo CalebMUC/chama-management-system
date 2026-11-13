@@ -24,6 +24,12 @@ public interface Ledger {
     /** Posts the mirror image of an entry. An entry can be reversed once; a reversal cannot be reversed. */
     UUID reverse(UUID chamaId, UUID entryId, UUID actorUserId, String reason);
 
+    /**
+     * Like {@link #reverse}, but the reversal is dated the same day as the entry it reverses, so the
+     * books for that day come out as if the entry had never been posted. For undoing imported history.
+     */
+    UUID reverseOnOriginalDate(UUID chamaId, UUID entryId, UUID actorUserId, String reason);
+
     /** The account's balance on its normal side (e.g. a positive asset, a positive liability). */
     Money balance(UUID chamaId, LedgerAccountKey account);
 

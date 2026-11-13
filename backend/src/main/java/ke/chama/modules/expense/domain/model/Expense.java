@@ -121,6 +121,19 @@ public final class Expense {
                 null, null, null, now, 0);
     }
 
+    /**
+     * An expense from the years before the chama used the system, decided outside it: approved and
+     * ready to be paid on its own date ({@link #pay}). The caller has checked the account and investment.
+     */
+    public static Expense historical(UUID chamaId, UUID importedBy, long amountMinor, String currency, String payee,
+                                     String description, String accountCode, UUID investmentId, LocalDate paidOn,
+                                     LocalDate today, Instant now) {
+        Expense expense = request(chamaId, importedBy, amountMinor, currency, payee, description, accountCode,
+                investmentId, paidOn, 1, today, now);
+        expense.status = Status.APPROVED;
+        return expense;
+    }
+
     /** One official's approval; the expense is approved once {@code requiredApprovals} distinct officials approve. */
     public void approve(UUID approverUserId, String note, Instant now) {
         requireNotRequester(approverUserId);

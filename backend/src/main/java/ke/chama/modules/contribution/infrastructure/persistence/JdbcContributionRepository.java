@@ -68,12 +68,24 @@ class JdbcContributionRepository implements ContributionRepository {
 
     @Override
     public boolean insertPeriod(ContributionPeriod p, Map<UUID, Long> amountPerProduct) {
+        return insertPeriod(p, amountPerProduct, null);
+    }
+
+    @Override
+    public boolean insertHistoricalPeriod(ContributionPeriod p, Map<UUID, Long> amountPerProduct, UUID batchId) {
+        return insertPeriod(p, amountPerProduct, java.util.Objects.requireNonNull(batchId, "batchId"));
+    }
+
+    private boolean insertPeriod(ContributionPeriod p, Map<UUID, Long> amountPerProduct, UUID batchId) {
         int inserted = jdbc.update("""
                 insert into contribution.periods (id, tenant_id, period_key, frequency, start_date, end_date, due_date,
-                                                  amount_due_minor, currency, opened_at)
-                values (:id, :tenant, :key, :frequency, :start, :end, :due, :amount, :currency, :openedAt)
+                                                  amount_due_minor, currency, opened_at, historical, import_batch_id)
+                values (:id, :tenant, :key, :frequency, :start, :end, :due, :amount, :currency, :openedAt, :historical,
+                        :batch)
                 on conflict (tenant_id, period_key) do nothing""",
                 new MapSqlParameterSource()
+                        .addValue("historical", batchId != null)
+                        .addValue("batch", batchId)
                         .addValue("id", p.id())
                         .addValue("tenant", p.chamaId())
                         .addValue("key", p.key())
@@ -386,4 +398,75 @@ class JdbcContributionRepository implements ContributionRepository {
             rs.getString("reversal_reason"),
             rs.getObject("reversal_entry_id", UUID.class),
             rs.getLong("version"));
+
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    @Override
+    public Set<UUID> historicalPeriodIds(UUID chamaId) {
+        return new HashSet<>(jdbc.queryForList(
+                "select id from contribution.periods where tenant_id = :tenant and historical",
+                Map.of("tenant", chamaId), UUID.class));
+    }
+
+    @Override
+    public int deleteBatchPeriods(UUID chamaId, UUID batchId) {
+        Map<String, Object> params = Map.of("tenant", chamaId, "batch", batchId);
+        jdbc.update("""
+                delete from contribution.dues d
+                 using contribution.periods p
+                 where d.tenant_id = :tenant and p.tenant_id = :tenant and d.period_id = p.id
+                   and p.import_batch_id = :batch""", params);
+        jdbc.update("""
+                delete from contribution.period_products pp
+                 using contribution.periods p
+                 where pp.tenant_id = :tenant and p.tenant_id = :tenant and pp.period_id = p.id
+                   and p.import_batch_id = :batch""", params);
+        return jdbc.update("delete from contribution.periods where tenant_id = :tenant and import_batch_id = :batch",
+                params);
+    }
+
+    @Override
+    public int deleteDuesBefore(UUID chamaId, UUID memberUserId, UUID productId, LocalDate openedOn) {
+        return jdbc.update("""
+                        delete from contribution.dues d
+                         using contribution.periods p
+                         where d.tenant_id = :tenant and p.tenant_id = :tenant and d.period_id = p.id
+                           and d.member_user_id = :member and d.product_id = :product and p.due_date < :openedOn""",
+                new MapSqlParameterSource()
+                        .addValue("tenant", chamaId)
+                        .addValue("member", memberUserId)
+                        .addValue("product", productId)
+                        .addValue("openedOn", Date.valueOf(openedOn)));
+    }
+
+    @Override
+    public void markImported(UUID chamaId, Collection<UUID> paymentIds, UUID batchId) {
+        if (paymentIds.isEmpty()) {
+            return;
+        }
+        jdbc.update("""
+                        update contribution.payments set import_batch_id = :batch
+                         where tenant_id = :tenant and id in (:ids)""",
+                new MapSqlParameterSource()
+                        .addValue("batch", batchId)
+                        .addValue("tenant", chamaId)
+                        .addValue("ids", paymentIds));
+    }
+
+    @Override
+    public List<ContributionPayment> importedPayments(UUID chamaId, UUID batchId) {
+        return jdbc.query("select " + PAYMENT_COLUMNS + """
+                         from contribution.payments
+                        where tenant_id = :tenant and import_batch_id = :batch and status = 'RECORDED'
+                        order by paid_on desc""",
+                Map.of("tenant", chamaId, "batch", batchId), PAYMENT);
+    }
+
+    @Override
+    public Set<String> recordedReferences(UUID chamaId) {
+        return new HashSet<>(jdbc.queryForList("""
+                        select method || ':' || upper(reference) from contribution.payments
+                         where tenant_id = :tenant and status = 'RECORDED' and reference is not null""",
+                Map.of("tenant", chamaId), String.class));
+    }
 }

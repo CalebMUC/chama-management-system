@@ -2347,3 +2347,49 @@ export type ErrorCode =
   | 'REPORT_INVALID_PERIOD' | 'REPORT_NOT_A_CASH_ACCOUNT' | 'REPORT_MEMBER_NOT_FOUND'
   // imports
   | 'IMPORT_INVALID_FILE' | 'IMPORT_HAS_PROBLEMS' | 'IMPORT_ALREADY_DONE';
+
+// ---- History import (/imports/history) ----------------------------------------------------------
+
+export type HistoryImportKind = 'SETUP' | 'CONTRIBUTIONS' | 'LOANS' | 'PENALTIES' | 'INVESTMENTS' | 'EXPENSES' | 'RECONCILIATION';
+
+/** AMOUNT carries minor units in `value` and a formatted `text`; COUNT, DATE and TEXT are ready in `text`. */
+export interface HistorySummaryLine {
+  label: string;
+  type: 'AMOUNT' | 'COUNT' | 'DATE' | 'TEXT';
+  value: number | null;
+  text: string | null;
+}
+
+export interface HistoryTableView {
+  title: string;
+  columns: string[];
+  /** Cells already formatted for display. */
+  rows: string[][];
+}
+
+export interface HistoryPreviewView {
+  kind: HistoryImportKind;
+  importable: boolean;
+  rows: number;
+  errors: number;
+  warnings: number;
+  summary: HistorySummaryLine[];
+  tables: HistoryTableView[];
+  /** At most 1,000, errors first. */
+  problems: ImportProblemView[];
+}
+
+export interface HistoryBatchView {
+  id: UUID;
+  kind: HistoryImportKind;
+  fileName: string | null;
+  rowCount: number;
+  summary: HistorySummaryLine[];
+  importedBy: UUID;
+  importedByName: string | null;
+  importedAt: ISOInstant;
+  undoneBy: UUID | null;
+  undoneAt: ISOInstant | null;
+  undoable: boolean;
+  undoBlockedReason: string | null;
+}

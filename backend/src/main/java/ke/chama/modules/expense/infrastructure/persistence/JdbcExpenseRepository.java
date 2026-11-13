@@ -237,4 +237,36 @@ class JdbcExpenseRepository implements ExpenseRepository {
     private static Timestamp timestamp(Instant instant) {
         return instant == null ? null : Timestamp.from(instant);
     }
+
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    @Override
+    public void markImported(UUID chamaId, java.util.Collection<UUID> expenseIds, UUID batchId) {
+        if (!expenseIds.isEmpty()) {
+            jdbc.update("update expense.expenses set import_batch_id = :batch where tenant_id = :tenant and id in (:ids)",
+                    new MapSqlParameterSource().addValue("batch", batchId).addValue("tenant", chamaId)
+                            .addValue("ids", expenseIds));
+        }
+    }
+
+    @Override
+    public List<Expense> importedExpenses(UUID chamaId, UUID batchId) {
+        return hydrate(chamaId, jdbc.query("select " + COLUMNS + " from expense.expenses"
+                        + " where tenant_id = :tenant and import_batch_id = :batch",
+                Map.of("tenant", chamaId, "batch", batchId), (rs, i) -> row(rs)));
+    }
+
+    @Override
+    public void deleteImported(UUID chamaId, UUID batchId) {
+        jdbc.update("delete from expense.expenses where tenant_id = :tenant and import_batch_id = :batch",
+                Map.of("tenant", chamaId, "batch", batchId));
+    }
+
+    @Override
+    public java.util.Set<String> usedReferences(UUID chamaId) {
+        return new java.util.HashSet<>(jdbc.queryForList("""
+                        select payment_method || ':' || upper(payment_reference) from expense.expenses
+                         where tenant_id = :tenant and payment_reference is not null""",
+                Map.of("tenant", chamaId), String.class));
+    }
 }

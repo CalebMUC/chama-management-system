@@ -200,6 +200,42 @@ public final class Loan {
                 importedBy, null, null, Objects.requireNonNull(openingEntryId), repaidMinor, now, 0);
     }
 
+    /**
+     * A loan from the years before the chama used the system, with what was repaid by now: active,
+     * or repaid in full. It was decided outside the system, so it carries no guarantors or approvals.
+     * Its schedule runs from {@code disbursedOn}: equal monthly instalments of principal plus flat
+     * interest, the first a month after disbursement.
+     *
+     * @param reference the disbursement's M-Pesa code or bank slip, already normalised; may be null
+     */
+    public static Loan historical(UUID id, UUID chamaId, UUID borrowerUserId, UUID productId, long principalMinor, long interestMinor,
+                                  int termMonths, LocalDate disbursedOn, long repaidMinor, String purpose, String currency,
+                                  String method, String reference, UUID importedBy, UUID disbursementEntryId,
+                                  Instant now) {
+        if (principalMinor <= 0 || interestMinor < 0) {
+            throw new InvalidLoanException("The principal must be greater than zero and the interest not negative");
+        }
+        if (termMonths < 1 || termMonths > MAX_TERM_MONTHS) {
+            throw new InvalidLoanException("The term must be between 1 and " + MAX_TERM_MONTHS + " months");
+        }
+        if (repaidMinor < 0 || repaidMinor > principalMinor + interestMinor) {
+            throw new InvalidLoanException("What was repaid cannot exceed principal plus interest");
+        }
+        if (method == null || !METHODS.contains(method)) {
+            throw new InvalidLoanException("method must be CASH, BANK or MPESA");
+        }
+        String why = purpose == null || purpose.isBlank() ? "Loan from the chama's records" : purpose.trim();
+        if (why.length() > MAX_TEXT_LENGTH) {
+            throw new InvalidLoanException("The purpose must be at most " + MAX_TEXT_LENGTH + " characters");
+        }
+        int interestBp = BigDecimal.valueOf(interestMinor).multiply(BigDecimal.valueOf(10_000))
+                .divide(BigDecimal.valueOf(principalMinor), 0, RoundingMode.HALF_UP).intValueExact();
+        Status status = repaidMinor == principalMinor + interestMinor ? Status.REPAID : Status.ACTIVE;
+        return new Loan(Objects.requireNonNull(id), chamaId, borrowerUserId, productId, principalMinor, interestBp, interestMinor,
+                termMonths, why, currency, disbursedOn, 0, 1, List.of(), List.of(), status, null, null, null, null,
+                disbursedOn, importedBy, method, reference, Objects.requireNonNull(disbursementEntryId), repaidMinor, now, 0);
+    }
+
     // ---- guarantors -----------------------------------------------------------------------------
 
     /** The borrower names another guarantor, e.g. after one declined. */

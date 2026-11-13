@@ -4,7 +4,11 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** Contributions still unpaid (or part-paid) after their grace days, in the current chama. */
+/**
+ * Contributions still unpaid (or part-paid) after their grace days, in the current chama. Periods
+ * back-filled from the chama's earlier records (historical imports) are left out: they are never
+ * penalised automatically.
+ */
 public interface LateContributions {
 
     /**

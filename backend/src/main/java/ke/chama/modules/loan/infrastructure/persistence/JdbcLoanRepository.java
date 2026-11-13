@@ -248,6 +248,62 @@ class JdbcLoanRepository implements LoanRepository {
         return Boolean.TRUE.equals(exists);
     }
 
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    @Override
+    public void markImported(UUID chamaId, java.util.Collection<UUID> loanIds, java.util.Collection<UUID> repaymentIds,
+                             UUID batchId) {
+        if (!loanIds.isEmpty()) {
+            jdbc.update("update loan.loans set import_batch_id = :batch where tenant_id = :tenant and id in (:ids)",
+                    new MapSqlParameterSource().addValue("batch", batchId).addValue("tenant", chamaId)
+                            .addValue("ids", loanIds));
+        }
+        if (!repaymentIds.isEmpty()) {
+            jdbc.update("update loan.repayments set import_batch_id = :batch where tenant_id = :tenant and id in (:ids)",
+                    new MapSqlParameterSource().addValue("batch", batchId).addValue("tenant", chamaId)
+                            .addValue("ids", repaymentIds));
+        }
+    }
+
+    @Override
+    public List<Loan> importedLoans(UUID chamaId, UUID batchId) {
+        return hydrate(chamaId, jdbc.query("select " + COLUMNS + " from loan.loans"
+                        + " where tenant_id = :tenant and import_batch_id = :batch order by disbursed_on",
+                Map.of("tenant", chamaId, "batch", batchId), (rs, i) -> row(rs)));
+    }
+
+    @Override
+    public long laterRepayments(UUID chamaId, UUID batchId) {
+        Long count = jdbc.queryForObject("""
+                        select count(*) from loan.repayments r
+                          join loan.loans l on l.tenant_id = r.tenant_id and l.id = r.loan_id
+                         where r.tenant_id = :tenant and l.import_batch_id = :batch
+                           and (r.import_batch_id is null or r.import_batch_id <> :batch)""",
+                Map.of("tenant", chamaId, "batch", batchId), Long.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public void deleteImported(UUID chamaId, UUID batchId) {
+        Map<String, Object> params = Map.of("tenant", chamaId, "batch", batchId);
+        jdbc.update("""
+                delete from loan.repayments r using loan.loans l
+                 where r.tenant_id = :tenant and l.tenant_id = :tenant and r.loan_id = l.id
+                   and l.import_batch_id = :batch""", params);
+        jdbc.update("delete from loan.loans where tenant_id = :tenant and import_batch_id = :batch", params);
+    }
+
+    @Override
+    public Set<String> usedReferences(UUID chamaId) {
+        return new HashSet<>(jdbc.queryForList("""
+                        select method || ':' || upper(reference) from loan.repayments
+                         where tenant_id = :tenant and reference is not null
+                        union
+                        select disbursement_method || ':' || upper(disbursement_reference) from loan.loans
+                         where tenant_id = :tenant and disbursement_reference is not null""",
+                Map.of("tenant", chamaId), String.class));
+    }
+
     // ---- mapping --------------------------------------------------------------------------------
 
     /** A loans row before its guarantors and approvals are attached. */

@@ -89,6 +89,8 @@ Loan products (e.g. an emergency loan with its own terms) and savings products c
 | **Reports & dashboards** | Financial position, income statement, cash book, contribution matrix, loan ageing and PAR30, savings register, member statements; official and member dashboards |
 | **Audit log** | Append-only record of every accountable action |
 | **Opening-balance import** | Excel template → preview with row-level problems → one-time, all-or-nothing import |
+| **History import** | For a chama with years of records: one Excel template per step (setup, contributions, loans, penalties, investments, expenses, balance check), each previewed row by row and imported on its own dates; the latest import can be undone |
+| **Loan schedules** | Excel download of every loan being repaid: what is owed, what is overdue, the next instalment, and every instalment |
 | **Email notifications** | Verification, password reset, invitations, welcome, contribution receipts, loan and penalty notices |
 
 ---
@@ -144,7 +146,7 @@ Each module lives in `backend/src/main/java/ke/chama/modules/<module>` and is la
 | `transaction` | `ledger` | Double-entry ledger: chart of accounts, journal entries |
 | `report` | (reads others) | Financial statements, reports and dashboards |
 | `audit` | `audit` | Append-only audit log |
-| `dataimport` | `dataimport` | Opening-balance import from Excel |
+| `dataimport` | `dataimport` | Opening-balance and history imports from Excel |
 | `notification` | (none) | Emails, triggered by other modules' events |
 
 Shared building blocks (`ke.chama.shared`): `Money`, `PhoneNumber`, the response envelope and exception handling, security annotations and tenancy.
@@ -323,7 +325,7 @@ Paged lists add `meta` (`page`, `size`, `totalElements`, `totalPages`, `hasNext`
 | Ledger | `/ledger` (accounts, entries, statements, trial balance) |
 | Dashboards & reports | `/dashboard`, `/reports` |
 | Audit | `/audit-log` |
-| Import | `/imports/opening-balances` |
+| Import | `/imports/opening-balances`, `/imports/history` |
 | Platform admin | `/platform/chamas` |
 
 Documentation:
@@ -466,6 +468,7 @@ chama-management-system/
 - [x] Expenses with maker-checker approval
 - [x] Investments with approval, returns and profitability
 - [x] Opening-balance import from Excel
+- [x] History import from Excel (years of records, one file per step, undoable)
 - [x] Savings products, member accounts and loan products
 - [x] Reports and dashboards
 - [x] CI: build, test and publish the Docker image

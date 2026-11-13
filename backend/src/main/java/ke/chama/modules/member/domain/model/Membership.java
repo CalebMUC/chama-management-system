@@ -228,6 +228,17 @@ public class Membership extends AggregateRoot {
         return joinedAt;
     }
 
+    /**
+     * Corrects when a seated member joined, e.g. a member added by hand who in fact joined the
+     * chama years before it used the system. Contributions are owed from this day.
+     */
+    public void correctJoinedAt(Instant joined) {
+        if (status != MembershipStatus.ACTIVE && status != MembershipStatus.SUSPENDED) {
+            throw new IllegalStateException("Only a seated member's join date can be corrected");
+        }
+        this.joinedAt = java.util.Objects.requireNonNull(joined, "joined");
+    }
+
     public Instant getSuspendedAt() {
         return suspendedAt;
     }

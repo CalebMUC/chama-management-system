@@ -134,6 +134,26 @@ public final class Penalty {
         return penalty;
     }
 
+    /**
+     * A penalty or fine from the years before the chama used the system, as the chama recorded it.
+     *
+     * @param sourceKey unique per member, e.g. the import batch and the file's own ref for it
+     */
+    public static Penalty historical(UUID chamaId, UUID memberUserId, Kind kind, String sourceKey, String description,
+                                     long amountMinor, String currency, LocalDate assessedOn, UUID importedBy,
+                                     Instant now) {
+        if (amountMinor <= 0) {
+            throw new InvalidPenaltyException("A penalty must be greater than zero");
+        }
+        String text = description == null ? "" : description.trim();
+        if (text.isEmpty() || text.length() > MAX_TEXT_LENGTH) {
+            throw new InvalidPenaltyException("A reason is required (at most " + MAX_TEXT_LENGTH + " characters)");
+        }
+        return new Penalty(UUID.randomUUID(), chamaId, memberUserId, Objects.requireNonNull(kind), sourceKey, text,
+                amountMinor, currency, Objects.requireNonNull(assessedOn), importedBy, null, 0, 0, Status.OUTSTANDING,
+                null, null, null, null, now, 0);
+    }
+
     public void postedAs(UUID entryId) {
         this.assessmentEntryId = Objects.requireNonNull(entryId);
     }

@@ -84,6 +84,14 @@ public record JournalEntry(UUID id,
 
     /** The mirror image of this entry, dated {@code today}, which cancels it out. */
     public JournalEntry reversal(String reason, UUID recordedBy, LocalDate today, Instant now) {
+        return reversal(reason, recordedBy, today, today, now);
+    }
+
+    /**
+     * The mirror image of this entry, dated {@code entryDate}: e.g. the original's own date, when a
+     * record imported with a past date is undone, so reports for that period come out unchanged.
+     */
+    public JournalEntry reversal(String reason, UUID recordedBy, LocalDate entryDate, LocalDate today, Instant now) {
         String why = reason == null ? "" : reason.trim();
         if (why.isEmpty()) {
             throw new InvalidEntryException("A reason is required to reverse an entry");
@@ -92,7 +100,7 @@ public record JournalEntry(UUID id,
         if (text.length() > MAX_DESCRIPTION_LENGTH) {
             text = text.substring(0, MAX_DESCRIPTION_LENGTH);
         }
-        return create(chamaId, today, text, reference, PostingRequest.SOURCE_REVERSAL, id.toString(), id, recordedBy,
+        return create(chamaId, entryDate, text, reference, PostingRequest.SOURCE_REVERSAL, id.toString(), id, recordedBy,
                 lines.stream().map(JournalLine::mirrored).toList(), today, now);
     }
 

@@ -27,4 +27,12 @@ public interface MemberAccounts {
 
     /** The member's combined balance in the products that count toward their loan limit. */
     long loanBackingSavingsMinor(UUID chamaId, UUID memberUserId);
+
+    /**
+     * Moves the day an account was opened (history brought over from spreadsheets). Runs in the
+     * caller's transaction; audit-logged as MEMBER_ACCOUNT_OPENED_ON_CORRECTED.
+     *
+     * @return the opened date before the change
+     */
+    LocalDate correctOpenedOn(UUID chamaId, UUID accountId, LocalDate openedOn, UUID actorUserId);
 }

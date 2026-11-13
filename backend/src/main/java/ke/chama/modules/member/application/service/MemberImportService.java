@@ -67,4 +67,18 @@ class MemberImportService implements MemberImport {
                 user == null ? null : user.firstName(), user == null ? null : user.lastName(), membership.getEmail(),
                 true, membership.getJoinedAt());
     }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public LocalDate correctJoinDate(UUID chamaId, UUID userId, LocalDate joinedOn, UUID actorUserId) {
+        Membership membership = memberships.findByChamaIdAndUserId(chamaId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Not a member of this chama: " + userId));
+        LocalDate before = membership.getJoinedAt() == null ? null : LocalDate.ofInstant(membership.getJoinedAt(), zone);
+        membership.correctJoinedAt(joinedOn.atStartOfDay(zone).toInstant());
+        memberships.save(membership);
+        auditTrail.record(AuditEntry.of(chamaId, actorUserId, "MEMBER_JOIN_DATE_CORRECTED", MembershipService.TARGET,
+                membership.getId()).with(Map.of("joinedOn", joinedOn.toString(),
+                "previously", before == null ? "" : before.toString())));
+        return before;
+    }
 }

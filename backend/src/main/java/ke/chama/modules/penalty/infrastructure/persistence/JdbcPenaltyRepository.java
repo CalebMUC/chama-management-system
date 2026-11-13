@@ -226,4 +226,56 @@ class JdbcPenaltyRepository implements PenaltyRepository {
             rs.getObject("waiver_entry_id", UUID.class),
             rs.getTimestamp("created_at").toInstant(),
             rs.getLong("version"));
+
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    @Override
+    public void markImported(UUID chamaId, java.util.Collection<UUID> penaltyIds, java.util.Collection<UUID> paymentIds,
+                             UUID batchId) {
+        if (!penaltyIds.isEmpty()) {
+            jdbc.update("update penalty.penalties set import_batch_id = :batch where tenant_id = :tenant and id in (:ids)",
+                    new MapSqlParameterSource().addValue("batch", batchId).addValue("tenant", chamaId)
+                            .addValue("ids", penaltyIds));
+        }
+        if (!paymentIds.isEmpty()) {
+            jdbc.update("update penalty.payments set import_batch_id = :batch where tenant_id = :tenant and id in (:ids)",
+                    new MapSqlParameterSource().addValue("batch", batchId).addValue("tenant", chamaId)
+                            .addValue("ids", paymentIds));
+        }
+    }
+
+    @Override
+    public List<Penalty> importedPenalties(UUID chamaId, UUID batchId) {
+        return jdbc.query("select " + COLUMNS + " from penalty.penalties where tenant_id = :tenant"
+                + " and import_batch_id = :batch order by assessed_on", Map.of("tenant", chamaId, "batch", batchId), PENALTY);
+    }
+
+    @Override
+    public long laterPayments(UUID chamaId, UUID batchId) {
+        Long count = jdbc.queryForObject("""
+                        select count(*) from penalty.payments p
+                          join penalty.penalties x on x.tenant_id = p.tenant_id and x.id = p.penalty_id
+                         where p.tenant_id = :tenant and x.import_batch_id = :batch
+                           and (p.import_batch_id is null or p.import_batch_id <> :batch)""",
+                Map.of("tenant", chamaId, "batch", batchId), Long.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public void deleteImported(UUID chamaId, UUID batchId) {
+        Map<String, Object> params = Map.of("tenant", chamaId, "batch", batchId);
+        jdbc.update("""
+                delete from penalty.payments p using penalty.penalties x
+                 where p.tenant_id = :tenant and x.tenant_id = :tenant and p.penalty_id = x.id
+                   and x.import_batch_id = :batch""", params);
+        jdbc.update("delete from penalty.penalties where tenant_id = :tenant and import_batch_id = :batch", params);
+    }
+
+    @Override
+    public Set<String> usedReferences(UUID chamaId) {
+        return new HashSet<>(jdbc.queryForList("""
+                        select method || ':' || upper(reference) from penalty.payments
+                         where tenant_id = :tenant and reference is not null""",
+                Map.of("tenant", chamaId), String.class));
+    }
 }

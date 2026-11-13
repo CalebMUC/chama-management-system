@@ -231,6 +231,69 @@ class JdbcInvestmentRepository implements InvestmentRepository {
         return Boolean.TRUE.equals(exists);
     }
 
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    @Override
+    public void markImported(UUID chamaId, java.util.Collection<UUID> investmentIds, UUID batchId) {
+        if (investmentIds.isEmpty()) {
+            return;
+        }
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("batch", batchId).addValue("tenant", chamaId)
+                .addValue("ids", investmentIds);
+        jdbc.update("update investment.investments set import_batch_id = :batch where tenant_id = :tenant and id in (:ids)",
+                params);
+        jdbc.update("""
+                update investment.transactions set import_batch_id = :batch
+                 where tenant_id = :tenant and investment_id in (:ids)""", params);
+        jdbc.update("""
+                update investment.valuations set import_batch_id = :batch
+                 where tenant_id = :tenant and investment_id in (:ids)""", params);
+    }
+
+    @Override
+    public List<Investment> importedInvestments(UUID chamaId, UUID batchId) {
+        return hydrate(chamaId, jdbc.query("select " + COLUMNS + " from investment.investments"
+                        + " where tenant_id = :tenant and import_batch_id = :batch",
+                Map.of("tenant", chamaId, "batch", batchId), (rs, i) -> row(rs)));
+    }
+
+    @Override
+    public long laterActivity(UUID chamaId, UUID batchId) {
+        Long count = jdbc.queryForObject("""
+                        select (select count(*) from investment.transactions t
+                                  join investment.investments i on i.tenant_id = t.tenant_id and i.id = t.investment_id
+                                 where t.tenant_id = :tenant and i.import_batch_id = :batch
+                                   and (t.import_batch_id is null or t.import_batch_id <> :batch))
+                             + (select count(*) from investment.valuations v
+                                  join investment.investments i on i.tenant_id = v.tenant_id and i.id = v.investment_id
+                                 where v.tenant_id = :tenant and i.import_batch_id = :batch
+                                   and (v.import_batch_id is null or v.import_batch_id <> :batch))""",
+                Map.of("tenant", chamaId, "batch", batchId), Long.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public void deleteImported(UUID chamaId, UUID batchId) {
+        Map<String, Object> params = Map.of("tenant", chamaId, "batch", batchId);
+        jdbc.update("""
+                delete from investment.transactions t using investment.investments i
+                 where t.tenant_id = :tenant and i.tenant_id = :tenant and t.investment_id = i.id
+                   and i.import_batch_id = :batch""", params);
+        jdbc.update("""
+                delete from investment.valuations v using investment.investments i
+                 where v.tenant_id = :tenant and i.tenant_id = :tenant and v.investment_id = i.id
+                   and i.import_batch_id = :batch""", params);
+        jdbc.update("delete from investment.investments where tenant_id = :tenant and import_batch_id = :batch", params);
+    }
+
+    @Override
+    public java.util.Set<String> usedReferences(UUID chamaId) {
+        return new java.util.HashSet<>(jdbc.queryForList("""
+                        select method || ':' || upper(reference) from investment.transactions
+                         where tenant_id = :tenant and reference is not null""",
+                Map.of("tenant", chamaId), String.class));
+    }
+
     // ---- mapping --------------------------------------------------------------------------------
 
     /** An investments row before its approvals are attached. */

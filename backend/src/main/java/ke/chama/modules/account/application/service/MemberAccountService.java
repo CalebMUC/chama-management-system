@@ -146,6 +146,23 @@ public class MemberAccountService implements MemberAccounts, MemberAccountUseCas
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public LocalDate correctOpenedOn(UUID chamaId, UUID accountId, LocalDate openedOn, UUID actorUserId) {
+        MemberAccount account = repository.account(chamaId, accountId)
+                .orElseThrow(() -> new IllegalArgumentException("No such account: " + accountId));
+        LocalDate before = account.openedOn();
+        if (before.equals(openedOn)) {
+            return before;
+        }
+        if (!repository.updateAccount(account.openedSince(openedOn))) {
+            throw new org.springframework.dao.OptimisticLockingFailureException("Account " + accountId + " changed concurrently");
+        }
+        audit(account, actorUserId, "MEMBER_ACCOUNT_OPENED_ON_CORRECTED", Map.of("openedOn", openedOn.toString(),
+                "previously", before.toString()));
+        return before;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public long loanBackingSavingsMinor(UUID chamaId, UUID memberUserId) {
         return repository.products(chamaId).stream()

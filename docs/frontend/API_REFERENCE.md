@@ -441,6 +441,11 @@ Borrower withdraws before disbursement.
 #### GET `/loans`
 - Permission: `LOAN_VIEW_ALL` · Query: `memberUserId?`, `status?: LoanStatus`, `page`, `size` → `200 Paged<LoanView>` (newest first)
 
+#### GET `/loans/schedules`
+Every loan being repaid (status `ACTIVE`), for following up repayments.
+- Permission: `LOAN_VIEW_ALL` → `200` **binary** `.xlsx` (`filename="loan-schedules.xlsx"`), not wrapped in the envelope.
+- Sheet *Summary*: one row per loan by member number: principal, interest, total, repaid, outstanding, overdue (amount, instalments, days), next instalment (date, amount) and the last instalment's date. Sheet *Schedules*: one row per instalment with its due date, amount, paid, still to pay and status (Paid, Part paid, Due, Overdue).
+
 #### GET `/loans/{loanId}`
 - Permission: `LOAN_VIEW_ALL` → `200 LoanDetailView` · Errors: `LOAN_NOT_FOUND`
 
@@ -780,6 +785,44 @@ Checks every row; saves nothing.
 
 ### GET `/imports/opening-balances`
 - → `200 ImportView | null` (`data` is null, message "Opening balances have not been imported yet", when not done)
+
+---
+
+## 17a. History import (`/api/v1/imports/history`)
+
+For a chama that ran for years before using the system: every contribution, loan, penalty, investment and expense, each on its own date. Permission `CHAMA_SETTINGS_MANAGE` on all. One Excel file per step; `{kind}` is the step's slug, in this order:
+
+| # | `{kind}` | What it brings in |
+|---|---|---|
+| 1 | `setup` | Members' real join dates, and what each savings product asked per period since the chama started (back-fills the contribution periods before the chama's first period in the system; those periods are never penalised automatically) |
+| 2 | `contributions` | Every payment, split across products as the system would |
+| 3 | `loans` | Every loan (repaid or not) and every repayment; loans still being repaid carry on with their schedule |
+| 4 | `penalties` | Penalties and fines as recorded, with payments and waivers |
+| 5 | `investments` | Investments and their activity: deposits, income, withdrawals, valuations, closure |
+| 6 | `expenses` | Expenses paid |
+| 7 | `reconciliation` | Actual cash, bank and M-Pesa balances; differences are posted as one adjustment per date against retained surplus |
+
+Rules: `setup` comes first and only once (undo it to redo it); the others need it and may be imported in several files. Not available once opening balances were imported (§17), and §17 is refused while any history import is in place. Nothing is emailed. Bank and M-Pesa rows without a reference get one made up (`IMP-<batch>-<row>`), with a warning.
+
+### GET `/imports/history/{kind}/template`
+- → `200` **binary** `.xlsx` (`filename="history-<n>-<kind>-template.xlsx"`), not wrapped in the envelope. A *Read me* sheet explains every column; the chama's members (and products, loan products, expense accounts, investments) are filled in or offered in drop-downs. Members are named by number (`12` or `12 - Jane Doe`) or email.
+
+### POST `/imports/history/{kind}/preview`
+Checks every row; saves nothing.
+- Body: `multipart/form-data` with `file` (the .xlsx, ≤ 5 MB, ≤ 50,000 rows per sheet).
+- → `200 HistoryPreviewView` — "Ready to import" or "4 problems to fix". `summary` and `tables` are ready to display (cells formatted); `problems` holds at most 1,000, errors first.
+- Errors: `IMPORT_INVALID_FILE` (400), `PAYLOAD_TOO_LARGE` (413)
+
+### POST `/imports/history/{kind}`
+- Same multipart body → `201 HistoryBatchView` — "Imported". All rows or none.
+- Errors: `IMPORT_HAS_PROBLEMS` (422; preview to see them), `IMPORT_NOT_ALLOWED` (409: setup missing or already done, or opening balances imported), `IMPORT_INVALID_FILE`
+
+### GET `/imports/history/batches`
+- → `200 HistoryBatchView[]`, newest first, including undone ones (`undoneAt` set).
+
+### POST `/imports/history/batches/{id}/undo`
+Only the latest batch still in place, and only while nothing recorded since depends on it (`undoable`; else `undoBlockedReason`, e.g. a repayment recorded on an imported loan). Removes what it created; ledger entries are reversed, each reversal dated as its original. Contribution payments are reversed rather than deleted.
+- → `200 HistoryBatchView` — "Import undone" · Errors: `IMPORT_UNDO_NOT_ALLOWED` (409), `IMPORT_BATCH_NOT_FOUND` (404)
 
 ---
 

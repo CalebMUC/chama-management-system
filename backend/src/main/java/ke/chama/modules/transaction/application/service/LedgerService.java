@@ -117,6 +117,18 @@ public class LedgerService implements Ledger, LedgerUseCases {
     }
 
     @Override
+    public UUID reverseOnOriginalDate(UUID chamaId, UUID entryId, UUID actorUserId, String reason) {
+        JournalEntry original = repository.entry(chamaId, entryId).orElseThrow(EntryNotFoundException::new);
+        if (original.isReversal()) {
+            throw new CannotReverseReversalException();
+        }
+        if (repository.reversalOf(chamaId, entryId).isPresent()) {
+            throw new AlreadyReversedException(original.number());
+        }
+        return save(original.reversal(reason, actorUserId, original.entryDate(), today(), clock.instant())).id();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Money balance(UUID chamaId, LedgerAccountKey key) {
         LedgerAccount account = accountByKey(chamaId, key);

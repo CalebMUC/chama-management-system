@@ -87,4 +87,17 @@ public record MemberAccount(UUID id,
         return new MemberAccount(id, chamaId, accountNumber, memberUserId, productId, Status.ACTIVE, today, by,
                 null, null, null, createdAt, version);
     }
+
+    /**
+     * The account as if opened on {@code day}: for history brought over from spreadsheets, where a
+     * member added by hand in fact held the account years before. Dues are owed from that day.
+     */
+    public MemberAccount openedSince(LocalDate day) {
+        Objects.requireNonNull(day, "day");
+        if (closedOn != null && !day.isBefore(closedOn)) {
+            throw new AccountStateException("Account " + accountNumber + " cannot be opened after it was closed");
+        }
+        return new MemberAccount(id, chamaId, accountNumber, memberUserId, productId, status, day, openedBy, closedOn,
+                closedBy, closureReason, createdAt, version);
+    }
 }

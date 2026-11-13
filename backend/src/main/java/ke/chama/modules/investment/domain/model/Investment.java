@@ -186,6 +186,31 @@ public final class Investment {
                 currentValueMinor == null ? null : asOf, null, null, null, now, 0);
     }
 
+    /**
+     * An investment from the years before the chama used the system, decided outside it: approved,
+     * ready to be funded on its own date and then to replay what happened to it since. The maturity
+     * date may be in the past (it matured).
+     */
+    public static Investment historical(UUID chamaId, UUID importedBy, String name, Type type, String institution,
+                                        String description, long amountMinor, String currency,
+                                        Integer expectedReturnBasisPoints, LocalDate maturityDate, Instant now) {
+        if (type == null) {
+            throw new InvalidInvestmentException("A type is required");
+        }
+        if (amountMinor <= 0) {
+            throw new InvalidInvestmentException("The amount must be greater than zero");
+        }
+        if (expectedReturnBasisPoints != null && (expectedReturnBasisPoints < 0 || expectedReturnBasisPoints > 100_000)) {
+            throw new InvalidInvestmentException("The expected return must be between 0% and 1000%");
+        }
+        return new Investment(UUID.randomUUID(), chamaId, text(name, MAX_NAME_LENGTH, "name"), type,
+                optional(institution, MAX_NAME_LENGTH, "institution"),
+                optional(description == null || description.isBlank() ? "From the chama's records" : description,
+                        MAX_TEXT_LENGTH, "description"),
+                amountMinor, currency, expectedReturnBasisPoints, maturityDate, importedBy, 1, List.of(), Status.APPROVED,
+                null, null, null, null, null, 0, 0, 0, 0, null, null, null, null, null, now, 0);
+    }
+
     // ---- decisions ------------------------------------------------------------------------------
 
     public void approve(UUID approverUserId, String note, Instant now) {

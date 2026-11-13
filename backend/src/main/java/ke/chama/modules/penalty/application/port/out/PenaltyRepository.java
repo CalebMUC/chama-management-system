@@ -40,4 +40,20 @@ public interface PenaltyRepository {
      */
     ke.chama.modules.penalty.api.PenaltyReports.PenaltySummary summary(UUID chamaId, java.time.LocalDate from,
                                                                        java.time.LocalDate to, String zone, int topOwing);
+
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    void markImported(UUID chamaId, java.util.Collection<UUID> penaltyIds, java.util.Collection<UUID> paymentIds,
+                      UUID batchId);
+
+    List<Penalty> importedPenalties(UUID chamaId, UUID batchId);
+
+    /** Payments on the batch's penalties that the batch did not create (recorded by hand since). */
+    long laterPayments(UUID chamaId, UUID batchId);
+
+    /** Deletes the batch's penalties and their payments. */
+    void deleteImported(UUID chamaId, UUID batchId);
+
+    /** References of penalty payments, as METHOD:REFERENCE upper case. */
+    Set<String> usedReferences(UUID chamaId);
 }

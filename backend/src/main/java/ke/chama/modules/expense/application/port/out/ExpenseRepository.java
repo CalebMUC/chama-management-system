@@ -36,4 +36,15 @@ public interface ExpenseRepository {
 
     record AccountTotal(String accountCode, long totalMinor, int count) {
     }
+
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    void markImported(UUID chamaId, java.util.Collection<UUID> expenseIds, UUID batchId);
+
+    List<Expense> importedExpenses(UUID chamaId, UUID batchId);
+
+    void deleteImported(UUID chamaId, UUID batchId);
+
+    /** References of expense payments, as METHOD:REFERENCE upper case. */
+    java.util.Set<String> usedReferences(UUID chamaId);
 }

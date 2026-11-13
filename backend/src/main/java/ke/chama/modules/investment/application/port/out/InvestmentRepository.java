@@ -33,4 +33,20 @@ public interface InvestmentRepository {
     List<Investment.Valuation> valuations(UUID chamaId, UUID investmentId);
 
     boolean referenceExists(UUID chamaId, String method, String reference);
+
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    /** Tags the investments, and every transaction and valuation of theirs, as created by an import batch. */
+    void markImported(UUID chamaId, java.util.Collection<UUID> investmentIds, UUID batchId);
+
+    List<Investment> importedInvestments(UUID chamaId, UUID batchId);
+
+    /** Transactions and valuations on the batch's investments that the batch did not create. */
+    long laterActivity(UUID chamaId, UUID batchId);
+
+    /** Deletes the batch's investments with their transactions and valuations. */
+    void deleteImported(UUID chamaId, UUID batchId);
+
+    /** References of transactions, as METHOD:REFERENCE upper case. */
+    java.util.Set<String> usedReferences(UUID chamaId);
 }

@@ -19,4 +19,12 @@ public interface MemberImport {
      */
     MemberSummary importMember(UUID chamaId, UUID userId, String email, LocalDate joinedOn, Set<String> roles,
                                UUID importedBy);
+
+    /**
+     * Corrects when a seated member joined (history brought over from spreadsheets: members added by
+     * hand join "today"). Runs in the caller's transaction; audit-logged as MEMBER_JOIN_DATE_CORRECTED.
+     *
+     * @return the join date before the change
+     */
+    LocalDate correctJoinDate(UUID chamaId, UUID userId, LocalDate joinedOn, UUID actorUserId);
 }

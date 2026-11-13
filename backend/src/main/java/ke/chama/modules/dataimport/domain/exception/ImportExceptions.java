@@ -30,4 +30,24 @@ public final class ImportExceptions {
                     + "). Record later changes as contributions, loans, expenses and so on.");
         }
     }
+
+    /** A historical import that cannot run now, e.g. before the setup, or after opening balances. */
+    public static class HistoryImportNotAllowedException extends DomainException {
+        public HistoryImportNotAllowedException(String message) {
+            super("IMPORT_NOT_ALLOWED", ErrorType.CONFLICT, message);
+        }
+    }
+
+    public static class ImportBatchNotFoundException extends DomainException {
+        public ImportBatchNotFoundException() {
+            super("IMPORT_BATCH_NOT_FOUND", ErrorType.NOT_FOUND, "No such import in this chama");
+        }
+    }
+
+    /** Only the latest import can be undone, and only while nothing recorded since depends on it. */
+    public static class UndoNotAllowedException extends DomainException {
+        public UndoNotAllowedException(String message) {
+            super("IMPORT_UNDO_NOT_ALLOWED", ErrorType.CONFLICT, message);
+        }
+    }
 }

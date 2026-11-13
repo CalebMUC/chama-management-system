@@ -336,12 +336,16 @@ public class ContributionService implements ContributionUseCases, LateContributi
         Book book = book(chamaId);
         String currency = rules(chamaId).currency();
         Set<UUID> seated = seatedById(chamaId).keySet();
+        // Periods back-filled from the chama's earlier records are never penalised automatically:
+        // the penalties of those years were imported as the chama recorded them.
+        Set<UUID> historical = repository.historicalPeriodIds(chamaId);
         List<LateContribution> late = new ArrayList<>();
         book.standings.forEach((memberId, standing) -> {
             if (!seated.contains(memberId)) {
                 return;
             }
-            standing.periods().stream().filter(PeriodStanding::late).forEach(ps -> late.add(new LateContribution(
+            standing.periods().stream().filter(PeriodStanding::late)
+                    .filter(ps -> !historical.contains(ps.period().id())).forEach(ps -> late.add(new LateContribution(
                     memberId, ps.period().id(), ps.period().key(), ps.period().dueDate(), ps.outstandingMinor(), currency)));
         });
         late.sort(Comparator.comparing(LateContribution::dueDate).thenComparing(LateContribution::memberUserId));

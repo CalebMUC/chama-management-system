@@ -3,6 +3,7 @@ package ke.chama.modules.loan.presentation.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import ke.chama.modules.loan.application.port.in.LoanSchedules;
 import ke.chama.modules.loan.application.port.in.LoanUseCases;
 import ke.chama.modules.loan.application.port.in.LoanUseCases.EligibilityView;
 import ke.chama.modules.loan.application.port.in.LoanUseCases.GuaranteeView;
@@ -27,7 +28,11 @@ import ke.chama.shared.tenancy.RequiresFeature;
 import ke.chama.shared.tenancy.TenantContext;
 import ke.chama.shared.web.ApiResponse;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -68,9 +73,26 @@ class LoanController {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final LoanUseCases loans;
+    private final LoanSchedules schedules;
 
-    LoanController(LoanUseCases loans) {
+    LoanController(LoanUseCases loans, LoanSchedules schedules) {
         this.loans = loans;
+        this.schedules = schedules;
+    }
+
+    @Operation(summary = "Download loan schedules",
+            description = "An .xlsx workbook of every loan being repaid: what each borrower still owes, what is overdue "
+                    + "and the next instalment (Summary), and every instalment of every loan (Schedules).")
+    @GetMapping("/schedules")
+    @RequiresChamaPermission(ChamaPermission.LOAN_VIEW_ALL)
+    ResponseEntity<byte[]> schedules() {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename("loan-schedules.xlsx").build()
+                                .toString())
+                .body(schedules.export(TenantContext.requireChama()));
     }
 
     // ---- members --------------------------------------------------------------------------------

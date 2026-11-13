@@ -14,9 +14,11 @@ import ke.chama.modules.chama.api.ChamaSummary;
 import ke.chama.modules.chama.api.LicenseSummary;
 import ke.chama.modules.contribution.api.ContributionCalendar;
 import ke.chama.modules.dataimport.application.port.in.OpeningBalanceImports;
+import ke.chama.modules.dataimport.application.port.out.HistoryImportRecords;
 import ke.chama.modules.dataimport.application.port.out.ImportRecords;
 import ke.chama.modules.dataimport.application.port.out.SpreadsheetFormat;
 import ke.chama.modules.dataimport.domain.exception.ImportExceptions.AlreadyImportedException;
+import ke.chama.modules.dataimport.domain.exception.ImportExceptions.HistoryImportNotAllowedException;
 import ke.chama.modules.dataimport.domain.exception.ImportExceptions.ImportHasProblemsException;
 import ke.chama.modules.dataimport.domain.model.OpeningBalanceCheck;
 import ke.chama.modules.dataimport.domain.model.OpeningBalancePlan;
@@ -79,6 +81,7 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
 
     private final SpreadsheetFormat spreadsheets;
     private final ImportRecords records;
+    private final HistoryImportRecords history;
     private final ChamaDirectory chamas;
     private final MemberDirectory members;
     private final MemberImport memberImport;
@@ -95,7 +98,8 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
     private final Clock clock;
     private final ZoneId zone;
 
-    public OpeningBalanceImportService(SpreadsheetFormat spreadsheets, ImportRecords records, ChamaDirectory chamas,
+    public OpeningBalanceImportService(SpreadsheetFormat spreadsheets, ImportRecords records,
+                                       HistoryImportRecords history, ChamaDirectory chamas,
                                        MemberDirectory members, MemberImport memberImport, UserDirectory users,
                                        UserProvisioning provisioning, LoanImport loanImport, PenaltyImport penaltyImport,
                                        InvestmentImport investmentImport, ContributionCalendar contributions,
@@ -106,6 +110,7 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
         this.memberAccounts = memberAccounts;
         this.spreadsheets = spreadsheets;
         this.records = records;
+        this.history = history;
         this.chamas = chamas;
         this.members = members;
         this.memberImport = memberImport;
@@ -134,6 +139,9 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
         List<Problem> problems = new ArrayList<>(plan.problems());
         records.find(chamaId).ifPresent(done -> problems.add(0, Problem.error(null, null, null,
                 "Opening balances were already imported (as at " + done.asOf() + ")")));
+        if (historyImported(chamaId)) {
+            problems.add(0, Problem.error(null, null, null, HISTORY_IMPORTED));
+        }
         long errors = problems.stream().filter(Problem::blocking).count();
         return new PreviewView(errors == 0, asOf, errors, problems.size() - errors, summary(chamaId, plan),
                 problems.stream().map(OpeningBalanceImportService::view).toList());
@@ -144,6 +152,9 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
         Optional<ImportView> done = records.find(chamaId);
         if (done.isPresent()) {
             throw new AlreadyImportedException(done.get().asOf().toString());
+        }
+        if (historyImported(chamaId)) {
+            throw new HistoryImportNotAllowedException(HISTORY_IMPORTED);
         }
         OpeningBalancePlan plan = plan(chamaId, file, asOf);
         if (!plan.importable()) {
@@ -223,6 +234,13 @@ public class OpeningBalanceImportService implements OpeningBalanceImports {
     }
 
     // ---- helpers --------------------------------------------------------------------------------
+
+    static final String HISTORY_IMPORTED = "The chama's history is being imported (Imports, History). Opening balances "
+            + "cannot be imported as well: savings would be counted twice.";
+
+    private boolean historyImported(UUID chamaId) {
+        return history.all(chamaId).stream().anyMatch(HistoryImportRecords.Batch::active);
+    }
 
     private OpeningBalancePlan plan(UUID chamaId, byte[] file, LocalDate asOf) {
         ChamaSummary chama = chamas.find(chamaId).orElseThrow();

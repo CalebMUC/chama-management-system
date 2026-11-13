@@ -78,4 +78,27 @@ public interface ContributionRepository {
 
     /** Recorded payments paid between the two days (inclusive, null = open): first day of month to {total, count}. */
     Map<LocalDate, long[]> paymentsByMonth(UUID chamaId, LocalDate from, LocalDate to);
+
+    // ---- history brought over from spreadsheets -------------------------------------------------
+
+    /** Like {@link #insertPeriod}, for a period before the chama used the system, created by an import batch. */
+    boolean insertHistoricalPeriod(ContributionPeriod period, Map<UUID, Long> amountPerProduct, UUID batchId);
+
+    /** Periods back-filled by imports: never penalised automatically. */
+    Set<UUID> historicalPeriodIds(UUID chamaId);
+
+    /** Deletes the periods the batch back-filled, with their dues. Returns how many periods. */
+    int deleteBatchPeriods(UUID chamaId, UUID batchId);
+
+    /** Deletes the member's dues in the product for periods due before {@code openedOn}. */
+    int deleteDuesBefore(UUID chamaId, UUID memberUserId, UUID productId, LocalDate openedOn);
+
+    /** Tags payments as created by an import batch. */
+    void markImported(UUID chamaId, Collection<UUID> paymentIds, UUID batchId);
+
+    /** The batch's payments that are still recorded (not reversed). */
+    List<ContributionPayment> importedPayments(UUID chamaId, UUID batchId);
+
+    /** References of recorded payments, as METHOD:REFERENCE in upper case. */
+    Set<String> recordedReferences(UUID chamaId);
 }

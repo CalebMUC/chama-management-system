@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -131,10 +132,12 @@ public class OpeningBalanceImportIntegrationTests {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.loan.outstandingMinor").value(2_200_000 - 275_000));
 
+        // Listing penalties also penalises this month's contribution once its grace days are over
+        // (the imported members owe it like anyone else), so only the brought-forward fine is counted.
         mvc.perform(chama.chair().get("/api/v1/penalties?status=OUTSTANDING"))
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].amountMinor").value(50_000))
-                .andExpect(jsonPath("$.data[0].description").value(containsString("brought forward")));
+                .andExpect(jsonPath("$.data[?(@.kind=='FINE')]").value(hasSize(1)))
+                .andExpect(jsonPath("$.data[?(@.kind=='FINE')].amountMinor").value(hasItem(50_000)))
+                .andExpect(jsonPath("$.data[?(@.kind=='FINE')].description").value(hasItem(containsString("brought forward"))));
         mvc.perform(chama.chair().get("/api/v1/investments/portfolio"))
                 .andExpect(jsonPath("$.data.activeCount").value(2))
                 .andExpect(jsonPath("$.data.bookValueMinor").value(5_500_000))

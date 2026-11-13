@@ -96,7 +96,7 @@ export interface PageParams {
 export type PlatformRole = 'ROLE_USER' | 'ROLE_ADMIN';
 
 /** Roles inside one chama. A member can hold several; every member always holds MEMBER. */
-export type ChamaRole = 'MEMBER' | 'TREASURER' | 'SECRETARY' | 'CHAIRPERSON' | 'AUDITOR';
+export type ChamaRole = 'MEMBER' | 'TREASURER' | 'SECRETARY' | 'CHAIRPERSON' | 'AUDITOR' | 'ADMIN';
 
 /**
  * Everything a member can be allowed to do. The UI must gate on these (from GET /members/me),

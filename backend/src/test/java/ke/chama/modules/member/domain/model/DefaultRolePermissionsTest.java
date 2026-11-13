@@ -39,6 +39,29 @@ class DefaultRolePermissionsTest {
     }
 
     @Test
+    void adminRunsOperationsButDoesNotHandleMoneyOrReshapeRoles() {
+        assertThat(DefaultRolePermissions.forRole(ChamaRole.ADMIN))
+                .contains(MEMBER_VIEW, MEMBER_INVITE, MEMBER_APPROVE, MEMBER_SUSPEND, MEMBER_ROLES_MANAGE,
+                        CHAMA_SETTINGS_MANAGE, PRODUCTS_MANAGE, MEMBER_ACCOUNTS_MANAGE)
+                .doesNotContain(CONTRIBUTION_RECORD, LOAN_APPROVE, LOAN_DISBURSE, EXPENSE_CREATE, EXPENSE_APPROVE,
+                        INVESTMENT_MANAGE, INVESTMENT_APPROVE, LEDGER_POST, PENALTY_WAIVE, ROLE_PERMISSIONS_MANAGE);
+    }
+
+    /** V22 grants ADMIN to chamas that existed before it; new chamas get DefaultRolePermissions. Keep them equal. */
+    @Test
+    void theAdminMigrationGrantsTheSameDefaults() throws Exception {
+        String sql;
+        try (var in = getClass().getResourceAsStream("/db/migration/V22__chama_admin_role.sql")) {
+            sql = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        java.util.Set<String> granted = java.util.regex.Pattern.compile("\\('([A-Z_]+)'\\)")
+                .matcher(sql.substring(sql.indexOf("CROSS JOIN")))
+                .results().map(m -> m.group(1)).collect(java.util.stream.Collectors.toSet());
+        assertThat(granted).isEqualTo(DefaultRolePermissions.forRole(ChamaRole.ADMIN).stream()
+                .map(Enum::name).collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
     void chairpersonHoldsEveryPermission() {
         assertThat(DefaultRolePermissions.forRole(ChamaRole.CHAIRPERSON)).containsExactlyInAnyOrder(ChamaPermission.values());
         assertThat(DefaultRolePermissions.forRole(ChamaRole.CHAIRPERSON))

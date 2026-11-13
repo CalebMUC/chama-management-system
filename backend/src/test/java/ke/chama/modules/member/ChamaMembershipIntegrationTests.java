@@ -263,6 +263,34 @@ class ChamaMembershipIntegrationTests {
         }
 
         @Test
+        void adminRunsMembershipButHandlesNoMoneyAndCannotReshapeRoles() throws Exception {
+            TestChama chama = accounts.onboard("Achieng");
+            Account admin = accounts.member(chama, "Ann");
+            Account applicant = accounts.applicant(chama, "Peter");
+
+            mvc.perform(chama.chair().get("/api/v1/roles"))
+                    .andExpect(jsonPath("$.data.ADMIN").value(hasItems("MEMBER_INVITE", "MEMBER_APPROVE", "MEMBER_ROLES_MANAGE")));
+            mvc.perform(chama.chair().put("/api/v1/members/{m}/roles", "{\"roles\":[\"ADMIN\"]}", accounts.membershipId(admin)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.roles").value(hasItems("MEMBER", "ADMIN")));
+
+            mvc.perform(admin.post("/api/v1/members/invitations", "{\"email\":\"%s\"}".formatted(TestAccounts.uniqueEmail("new"))))
+                    .andExpect(status().isCreated());
+            mvc.perform(admin.post("/api/v1/members/{id}/approve", accounts.membershipId(applicant)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+            mvc.perform(admin.put("/api/v1/members/{m}/roles", "{\"roles\":[\"TREASURER\"]}", accounts.membershipId(applicant)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.roles").value(hasItems("MEMBER", "TREASURER")));
+
+            mvc.perform(admin.get("/api/v1/members/me"))
+                    .andExpect(jsonPath("$.data.permissions").value(not(hasItem("CONTRIBUTION_RECORD"))))
+                    .andExpect(jsonPath("$.data.permissions").value(not(hasItem("LOAN_DISBURSE"))));
+            mvc.perform(admin.put("/api/v1/roles/ADMIN/permissions", "{\"permissions\":[\"CHAMA_VIEW\",\"LEDGER_POST\"]}"))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
         void chairpersonRoleCannotLoseRoleManagement() throws Exception {
             TestChama chama = accounts.onboard("Mutua");
 

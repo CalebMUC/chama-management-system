@@ -118,7 +118,7 @@ Two principles show up everywhere and must be visible in the UI:
 ### 2.3 Roles and permissions
 
 A member holds one or more **chama roles**: `MEMBER` (always), `TREASURER`, `SECRETARY`,
-`CHAIRPERSON`, `AUDITOR`. Roles map to **permissions**, and **each chama can change that mapping**
+`CHAIRPERSON`, `AUDITOR`, `ADMIN`. Roles map to **permissions**, and **each chama can change that mapping**
 (Settings → Roles & permissions). Therefore:
 
 > **Gate every screen, menu item and button on `permissions` from `GET /members/me`, never on role names.**
@@ -129,42 +129,42 @@ and after the user changes roles/permissions.
 
 Default mapping for a new chama (✓ = granted):
 
-| Permission | MEMBER | TREASURER | SECRETARY | CHAIRPERSON | AUDITOR | Unlocks |
-|---|:-:|:-:|:-:|:-:|:-:|---|
-| `CHAMA_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | Chama profile, licence |
-| `CHAMA_SETTINGS_MANAGE` | | | | ✓ | | Chama settings, opening-balance import |
-| `MEMBER_VIEW` | | ✓ | ✓ | ✓ | ✓ | Member directory, roles list |
-| `MEMBER_INVITE` | | | ✓ | ✓ | | Invite by email |
-| `MEMBER_APPROVE` | | | | ✓ | | Approve/reject applications |
-| `MEMBER_SUSPEND` | | | | ✓ | | Suspend/reactivate |
-| `MEMBER_ROLES_MANAGE` | | | | ✓ | | Change a member's roles |
-| `ROLE_PERMISSIONS_MANAGE` | | | | ✓ | | Edit role → permission mapping |
-| `CONTRIBUTION_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | All payments, periods, standings |
-| `CONTRIBUTION_RECORD` | | ✓ | | ✓ | | Record a payment |
-| `CONTRIBUTION_REVERSE` | | ✓ | | ✓ | | Reverse a payment |
-| `LOAN_APPLY` | ✓ | ✓ | ✓ | ✓ | ✓ | Eligibility, apply |
-| `LOAN_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | Loan book |
-| `LOAN_APPROVE` | | ✓ | | ✓ | | Approve/reject loans |
-| `LOAN_DISBURSE` | | ✓ | | ✓ | | Disburse |
-| `LOAN_REPAYMENT_RECORD` | | ✓ | | ✓ | | Record repayments |
-| `PENALTY_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | All penalties |
-| `PENALTY_RECORD` | | ✓ | | ✓ | | Fine, record payment, run assessment |
-| `PENALTY_WAIVE` | | | | ✓ | | Waive |
-| `EXPENSE_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | Expenses list/summary |
-| `EXPENSE_CREATE` | | ✓ | | ✓ | | Record, cancel, pay |
-| `EXPENSE_APPROVE` | | | ✓ | ✓ | | Approve/reject |
-| `INVESTMENT_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | Investments, portfolio |
-| `INVESTMENT_MANAGE` | | ✓ | | ✓ | | Propose, fund, record activity, close |
-| `INVESTMENT_APPROVE` | | | ✓ | ✓ | | Approve/reject |
-| `LEDGER_VIEW` | | ✓ | | ✓ | ✓ | Chart, journal, statements, trial balance |
-| `LEDGER_POST` | | ✓ | | ✓ | | Manual entries, reversals |
-| `LEDGER_ACCOUNTS_MANAGE` | | ✓ | | ✓ | | Add/deactivate accounts |
-| `REPORT_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | Chama dashboard, all reports |
-| `AUDIT_LOG_VIEW` | | | ✓ | ✓ | ✓ | Audit log |
-| `PRODUCTS_MANAGE` | | ✓ | | ✓ | | Savings and loan products |
-| `MEMBER_ACCOUNTS_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | Every member's accounts |
-| `MEMBER_ACCOUNTS_MANAGE` | | ✓ | | ✓ | | Open/close/reopen accounts |
-| `PAYMENT_SUBMIT` | ✓ | ✓ | ✓ | ✓ | ✓ | Report my own contribution, penalty payment or loan repayment for the treasurer to confirm |
+| Permission | MEMBER | TREASURER | SECRETARY | CHAIRPERSON | AUDITOR | ADMIN | Unlocks |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|---|
+| `CHAMA_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Chama profile, licence |
+| `CHAMA_SETTINGS_MANAGE` | | | | ✓ | | ✓ | Chama settings, opening-balance import |
+| `MEMBER_VIEW` | | ✓ | ✓ | ✓ | ✓ | ✓ | Member directory, roles list |
+| `MEMBER_INVITE` | | | ✓ | ✓ | | ✓ | Invite by email |
+| `MEMBER_APPROVE` | | | | ✓ | | ✓ | Approve/reject applications |
+| `MEMBER_SUSPEND` | | | | ✓ | | ✓ | Suspend/reactivate |
+| `MEMBER_ROLES_MANAGE` | | | | ✓ | | ✓ | Change a member's roles |
+| `ROLE_PERMISSIONS_MANAGE` | | | | ✓ | | | Edit role → permission mapping |
+| `CONTRIBUTION_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | ✓ | All payments, periods, standings |
+| `CONTRIBUTION_RECORD` | | ✓ | | ✓ | | | Record a payment |
+| `CONTRIBUTION_REVERSE` | | ✓ | | ✓ | | | Reverse a payment |
+| `LOAN_APPLY` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Eligibility, apply |
+| `LOAN_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | ✓ | Loan book |
+| `LOAN_APPROVE` | | ✓ | | ✓ | | | Approve/reject loans |
+| `LOAN_DISBURSE` | | ✓ | | ✓ | | | Disburse |
+| `LOAN_REPAYMENT_RECORD` | | ✓ | | ✓ | | | Record repayments |
+| `PENALTY_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | ✓ | All penalties |
+| `PENALTY_RECORD` | | ✓ | | ✓ | | | Fine, record payment, run assessment |
+| `PENALTY_WAIVE` | | | | ✓ | | | Waive |
+| `EXPENSE_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Expenses list/summary |
+| `EXPENSE_CREATE` | | ✓ | | ✓ | | | Record, cancel, pay |
+| `EXPENSE_APPROVE` | | | ✓ | ✓ | | | Approve/reject |
+| `INVESTMENT_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Investments, portfolio |
+| `INVESTMENT_MANAGE` | | ✓ | | ✓ | | | Propose, fund, record activity, close |
+| `INVESTMENT_APPROVE` | | | ✓ | ✓ | | | Approve/reject |
+| `LEDGER_VIEW` | | ✓ | | ✓ | ✓ | | Chart, journal, statements, trial balance |
+| `LEDGER_POST` | | ✓ | | ✓ | | | Manual entries, reversals |
+| `LEDGER_ACCOUNTS_MANAGE` | | ✓ | | ✓ | | | Add/deactivate accounts |
+| `REPORT_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | ✓ | Chama dashboard, all reports |
+| `AUDIT_LOG_VIEW` | | | ✓ | ✓ | ✓ | ✓ | Audit log |
+| `PRODUCTS_MANAGE` | | ✓ | | ✓ | | ✓ | Savings and loan products |
+| `MEMBER_ACCOUNTS_VIEW_ALL` | | ✓ | ✓ | ✓ | ✓ | ✓ | Every member's accounts |
+| `MEMBER_ACCOUNTS_MANAGE` | | ✓ | | ✓ | | ✓ | Open/close/reopen accounts |
+| `PAYMENT_SUBMIT` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Report my own contribution, penalty payment or loan repayment for the treasurer to confirm |
 
 `CHAMA_VIEW` also opens the members' chama overview (`GET /dashboard/overview`). Reviewing reported
 payments needs the matching record permission (`CONTRIBUTION_RECORD`, `PENALTY_RECORD`,
@@ -173,6 +173,10 @@ payments needs the matching record permission (`CONTRIBUTION_RECORD`, `PENALTY_R
 A member's effective permissions are the union over their roles. Things that need **no**
 permission, only an ACTIVE membership: everything under "My …" (`/…/me` endpoints), loan products
 list, savings products list, guarantee requests and answers, cancelling one's own loan application.
+
+`ADMIN` runs the chama's operations: it invites, approves and suspends members, assigns their roles
+(though never its own), and manages settings and products, but records, approves and disburses no money
+and cannot change what a role may do.
 
 The CHAIRPERSON role can never lose `MEMBER_ROLES_MANAGE` and `ROLE_PERMISSIONS_MANAGE`, and a
 chama must always keep at least one active chairperson.
@@ -716,7 +720,7 @@ Row actions (show when allowed and the state fits; never on the user's own row):
 | Reject | `MEMBER_APPROVE` | PENDING_APPROVAL | Confirm |
 | Suspend | `MEMBER_SUSPEND` | ACTIVE | Reason (required, ≤500) |
 | Reactivate | `MEMBER_SUSPEND` | SUSPENDED | Confirm |
-| Change roles | `MEMBER_ROLES_MANAGE` | ACTIVE | Checkboxes for TREASURER, SECRETARY, CHAIRPERSON, AUDITOR; MEMBER always on and disabled |
+| Change roles | `MEMBER_ROLES_MANAGE` | ACTIVE | Checkboxes for TREASURER, SECRETARY, CHAIRPERSON, AUDITOR, ADMIN; MEMBER always on and disabled |
 
 Errors to handle: `MEMBER_SELF_MANAGEMENT`, `MEMBER_LAST_CHAIRPERSON`, `MEMBER_INVALID_STATE` (refetch).
 

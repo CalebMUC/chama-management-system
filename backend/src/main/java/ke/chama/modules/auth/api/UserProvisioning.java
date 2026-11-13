@@ -16,6 +16,13 @@ public interface UserProvisioning {
      */
     UserSummary importAccount(ImportedAccount account, String chamaName);
 
+    /**
+     * An account a chama official opens for a member, with a temporary password the official
+     * hands over. No email is sent and the address is taken as confirmed; the owner must choose
+     * their own password at first sign-in before the API lets them do anything else.
+     */
+    UserSummary createMemberAccount(NewAccount account);
+
     record ImportedAccount(String email, String phoneNumber, String firstName, String lastName) {
     }
 

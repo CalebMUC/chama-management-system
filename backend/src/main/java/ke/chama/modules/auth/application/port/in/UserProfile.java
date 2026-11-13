@@ -17,12 +17,13 @@ public record UserProfile(UUID id,
                           String firstName,
                           String lastName,
                           Set<String> roles,
-                          Instant createdAt) {
+                          Instant createdAt,
+                          boolean mustChangePassword) {
 
     public static UserProfile from(User user) {
         return new UserProfile(user.getId(), user.getTenantId(), user.getEmail(), user.isEmailVerified(), user.getPhoneNumber(),
                 user.getFirstName(), user.getLastName(),
                 user.getRoles().stream().map(Role::getName).collect(Collectors.toUnmodifiableSet()),
-                user.getCreatedAt());
+                user.getCreatedAt(), user.isMustChangePassword());
     }
 }

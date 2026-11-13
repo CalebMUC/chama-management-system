@@ -321,6 +321,11 @@ export interface UserResponse {
   lastName: string;
   roles: PlatformRole[];
   createdAt: ISOInstant;
+  /**
+   * The password is a temporary one an official set (POST /members). Until it is changed through
+   * POST /auth/password/change, every other endpoint answers 403 AUTH_PASSWORD_CHANGE_REQUIRED.
+   */
+  mustChangePassword: boolean;
 }
 
 // =====================================================================================================
@@ -494,6 +499,47 @@ export interface InvitationView {
 export interface InviteMemberRequest {
   email: string;
 }
+/** POST /members (MEMBER_INVITE): an official opens an ACTIVE member's account. */
+export interface AddMemberRequest {
+  firstName: string; // max 100
+  lastName: string; // max 100
+  email: string; // max 255
+  phoneNumber: string; // max 20, same formats as RegisterRequest
+  /** Password rules as RegisterRequest. The member must replace it at first sign-in. */
+  temporaryPassword: string;
+  kyc: KycRequest;
+}
+
+export type IdDocumentType = 'NATIONAL_ID' | 'PASSPORT' | 'ALIEN_ID';
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+
+/** PUT /members/{id}/kyc (MEMBER_INVITE), and the `kyc` of AddMemberRequest. */
+export interface KycRequest {
+  idType: IdDocumentType;
+  /** Spaces and dashes are dropped and letters upper-cased. NATIONAL_ID: 5–10 digits; others: 5–20 letters/digits. */
+  idNumber: string;
+  /** The member must be at least 18 (MEMBER_UNDER_AGE). */
+  dateOfBirth: ISODate;
+  gender: Gender;
+  county: string; // max 60
+  town?: string | null; // max 100
+  physicalAddress?: string | null; // max 300
+}
+
+/** GET /members/{id}/kyc (MEMBER_VIEW): null when nothing was recorded yet. */
+export interface MemberKycView {
+  membershipId: UUID;
+  idType: IdDocumentType;
+  idNumber: string;
+  dateOfBirth: ISODate;
+  gender: Gender;
+  county: string;
+  town: string | null;
+  physicalAddress: string | null;
+  updatedBy: UUID;
+  updatedAt: ISOInstant;
+}
+
 export interface SuspendMemberRequest {
   reason: string; // max 500
 }
@@ -2157,7 +2203,8 @@ export interface AuditLogParams extends PageParams {
 export const KNOWN_AUDIT_ACTIONS = [
   'CHAMA_CREATED', 'CHAMA_SETTINGS_CHANGED', 'LICENSE_ISSUED', 'LICENSE_UPDATED',
   'MEMBER_APPLIED', 'MEMBER_INVITED', 'MEMBER_APPROVED', 'MEMBER_REJECTED', 'MEMBER_SUSPENDED', 'MEMBER_REACTIVATED',
-  'MEMBER_ROLES_CHANGED', 'MEMBER_FOUNDER_ENROLLED', 'MEMBER_IMPORTED', 'ROLE_PERMISSIONS_CHANGED',
+  'MEMBER_ROLES_CHANGED', 'MEMBER_FOUNDER_ENROLLED', 'MEMBER_IMPORTED', 'MEMBER_ADDED', 'MEMBER_KYC_RECORDED',
+  'MEMBER_KYC_UPDATED', 'ROLE_PERMISSIONS_CHANGED',
   'CONTRIBUTION_RECORDED', 'CONTRIBUTION_REVERSED',
   'PENALTY_ASSESSED', 'PENALTY_FINED', 'PENALTY_PAID', 'PENALTY_WAIVED', 'PENALTY_IMPORTED',
   'LOAN_APPLIED', 'LOAN_GUARANTOR_ADDED', 'LOAN_GUARANTEE_ACCEPTED', 'LOAN_APPROVAL_GIVEN', 'LOAN_APPROVED',
@@ -2243,7 +2290,7 @@ export type ErrorCode =
   | 'AUTH_INVALID_ACCESS_TOKEN' | 'AUTH_INVALID_TOKEN' | 'AUTH_INVALID_CREDENTIALS' | 'AUTH_ACCOUNT_LOCKED'
   | 'AUTH_ACCOUNT_DISABLED' | 'AUTH_EMAIL_NOT_VERIFIED' | 'AUTH_LINK_INVALID' | 'AUTH_CURRENT_PASSWORD_INCORRECT'
   | 'AUTH_USER_ALREADY_EXISTS' | 'AUTH_USER_NOT_FOUND' | 'AUTH_WEAK_PASSWORD' | 'AUTH_PASSWORD_TOO_LONG'
-  | 'AUTH_INVALID_EMAIL' | 'AUTH_INVALID_FIRSTNAME' | 'AUTH_INVALID_LASTNAME'
+  | 'AUTH_INVALID_EMAIL' | 'AUTH_INVALID_FIRSTNAME' | 'AUTH_INVALID_LASTNAME' | 'AUTH_PASSWORD_CHANGE_REQUIRED'
   // chama & licence
   | 'CHAMA_NOT_FOUND' | 'CHAMA_INVALID_SETTINGS' | 'CHAMA_CODE_TAKEN' | 'CHAMA_INVALID_CODE' | 'CHAMA_INVALID_NAME'
   | 'CHAMA_INVALID_DESCRIPTION' | 'LICENSE_EXPIRED' | 'LICENSE_SUSPENDED' | 'LICENSE_FEATURE_NOT_INCLUDED'
@@ -2251,7 +2298,8 @@ export type ErrorCode =
   | 'LICENSE_INVALID_PERIOD'
   // members
   | 'MEMBER_NOT_FOUND' | 'MEMBER_ALREADY_EXISTS' | 'MEMBER_SELF_MANAGEMENT' | 'MEMBER_LAST_CHAIRPERSON'
-  | 'MEMBER_INVALID_STATE' | 'ROLE_PERMISSIONS_LOCKOUT'
+  | 'MEMBER_INVALID_STATE' | 'ROLE_PERMISSIONS_LOCKOUT' | 'MEMBER_ID_NUMBER_TAKEN' | 'MEMBER_INVALID_ID_NUMBER'
+  | 'MEMBER_INVALID_DATE_OF_BIRTH' | 'MEMBER_UNDER_AGE' | 'MEMBER_INVALID_COUNTY'
   // contributions
   | 'CONTRIBUTION_INVALID_PAYMENT' | 'CONTRIBUTION_MEMBER_NOT_FOUND' | 'CONTRIBUTION_SELF_RECORDING'
   | 'CONTRIBUTION_DUPLICATE_REFERENCE' | 'CONTRIBUTION_NOT_FOUND' | 'CONTRIBUTION_ALREADY_REVERSED'

@@ -69,6 +69,13 @@ public class User extends AggregateRoot {
     @Column(name = "password_changed_at")
     private Instant passwordChangedAt;
 
+    /**
+     * The password was set by someone else (a chama official adding the member). Until the owner
+     * chooses their own, the API answers AUTH_PASSWORD_CHANGE_REQUIRED to everything but that.
+     */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
@@ -167,6 +174,16 @@ public class User extends AggregateRoot {
     public void changePassword(String newPasswordHash, Instant now) {
         this.password = requireText(newPasswordHash, "password");
         this.passwordChangedAt = now;
+        this.mustChangePassword = false;
+    }
+
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
+    }
+
+    /** The current password is temporary: its owner must replace it at their next sign-in. */
+    public void requirePasswordChange() {
+        this.mustChangePassword = true;
     }
 
     public String getPhoneNumber() {

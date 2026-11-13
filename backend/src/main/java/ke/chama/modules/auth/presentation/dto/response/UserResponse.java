@@ -10,6 +10,8 @@ import java.util.UUID;
 /**
  * @param chamaId   the chama the account belongs to; null for platform administrators
  * @param chamaCode its code, as sent in {@code X-Chama-Code}; null for platform administrators
+ * @param mustChangePassword the password is a temporary one an official set: until it is changed,
+ *                           every other endpoint answers 403 AUTH_PASSWORD_CHANGE_REQUIRED
  */
 public record UserResponse(UUID id,
                            UUID chamaId,
@@ -20,12 +22,14 @@ public record UserResponse(UUID id,
                            String firstName,
                            String lastName,
                            Set<String> roles,
-                           Instant createdAt) {
+                           Instant createdAt,
+                           boolean mustChangePassword) {
 
     public static UserResponse from(UserProfile profile) {
         boolean platform = TenantContext.PLATFORM.equals(profile.tenantId());
         return new UserResponse(profile.id(), platform ? null : profile.tenantId(),
                 platform ? null : TenantContext.code().orElse(null), profile.email(), profile.emailVerified(), profile.phoneNumber(),
-                profile.firstName(), profile.lastName(), profile.roles(), profile.createdAt());
+                profile.firstName(), profile.lastName(), profile.roles(), profile.createdAt(),
+                profile.mustChangePassword());
     }
 }

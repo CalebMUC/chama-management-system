@@ -66,6 +66,9 @@ Ends every session of the caller (all devices).
 ### GET `/auth/me`
 - Auth: bearer
 - → `200 UserResponse`. `roles` contains `ROLE_ADMIN` for platform administrators (whose `chamaId`/`chamaCode` are null).
+- `mustChangePassword: true` → the account still has the temporary password an official set (`POST /members`). Send the
+  user to a change-password screen: until `POST /auth/password/change` succeeds, **every other endpoint** except
+  `GET /auth/me`, `/auth/logout`, `/auth/logout-all` and `/auth/refresh` answers `403 AUTH_PASSWORD_CHANGE_REQUIRED`.
 
 ### POST `/auth/email/verify`
 Called by the `/verify-email?chama=<code>&token=<token>` page.
@@ -95,6 +98,7 @@ Also used by imported members to set their first password (their link is valid 7
 - Auth: bearer
 - Body: `ChangePasswordRequest`
 - → `200 AuthResponse` — "Password changed. Your other devices have been logged out." **Replace stored tokens with the returned pair**; the old refresh token is revoked.
+- Also clears `mustChangePassword`: the returned tokens are no longer limited. Reload the app context (`/auth/me`, `/members/me`, …) afterwards.
 - Errors: `AUTH_CURRENT_PASSWORD_INCORRECT` (400, show on the current-password field), password policy errors
 
 ---
@@ -136,11 +140,41 @@ The caller's own membership in any status, plus effective permissions. **Call it
 - Use `status=ACTIVE` for officials' member pickers (contributions, fines, statements). Fetch all pages (≤100 per page) and cache.
 - Plain members do not hold `MEMBER_VIEW` by default; their guarantor picker uses `GET /loans/guarantor-candidates`.
 
+### POST `/members`
+An official opens a member's account directly, with their KYC details and a temporary password. The member is `ACTIVE`
+at once with the next member number (no approval step), **no email is sent** (the address is taken as confirmed), and
+the member must replace the password at first sign-in (`UserResponse.mustChangePassword`). Give the official the chama
+code, email and temporary password to hand over.
+- Permission: `MEMBER_INVITE` · Body: `AddMemberRequest`
+  ```json
+  { "firstName": "Wanjiru", "lastName": "Kamau", "email": "wanjiru@example.com", "phoneNumber": "0712 345 678",
+    "temporaryPassword": "Karibu2026",
+    "kyc": { "idType": "NATIONAL_ID", "idNumber": "12345678", "dateOfBirth": "1990-04-12", "gender": "FEMALE",
+             "county": "Nairobi", "town": "Kasarani", "physicalAddress": "Mwiki, House 12" } }
+  ```
+  `temporaryPassword` follows the registration rules. `kyc.town` and `kyc.physicalAddress` are optional.
+- → `201 MemberView` — "Member added. Give them the temporary password; they choose their own when they first sign in."
+- Errors: `MEMBER_ALREADY_EXISTS` (409, email), `MEMBER_ID_NUMBER_TAKEN` (409, another member holds the document),
+  `MEMBER_UNDER_AGE` (400, under 18), `MEMBER_INVALID_ID_NUMBER` (400), `MEMBER_INVALID_DATE_OF_BIRTH` (400),
+  `LICENSE_MEMBER_LIMIT_REACHED` (422), `INVALID_PHONE_NUMBER` (400), `VALIDATION_FAILED` (field paths like `kyc.county`)
+
 ### POST `/members/invitations`
 Emails a join link (`/join?chama=<code>`). The invitee still registers and is approved.
 - Permission: `MEMBER_INVITE` · Body: `InviteMemberRequest` `{ "email": "..." }`
 - → `201 InvitationView`
 - Errors: `MEMBER_ALREADY_EXISTS` (409)
+
+### GET `/members/{membershipId}/kyc`
+- Permission: `MEMBER_VIEW`
+- → `200 MemberKycView`, or `200 null` when nothing was recorded (e.g. members who registered themselves)
+- Errors: `MEMBER_NOT_FOUND`
+
+### PUT `/members/{membershipId}/kyc`
+Records or corrects a member's KYC details (any status). The audit log records `MEMBER_KYC_RECORDED` / `MEMBER_KYC_UPDATED`
+without the identity data itself.
+- Permission: `MEMBER_INVITE` · Body: `KycRequest` (the `kyc` object above)
+- → `200 MemberKycView` — "KYC details saved"
+- Errors: as the `kyc` part of `POST /members`, plus `MEMBER_NOT_FOUND`
 
 ### POST `/members/{membershipId}/approve`
 Activates a `PENDING_APPROVAL` applicant, assigns the next member number and emails them a welcome. Their accounts in mandatory savings products open by themselves.

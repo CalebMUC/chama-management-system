@@ -125,6 +125,18 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshSe
         return summary(user);
     }
 
+    /** For other modules: an account an official opens with a temporary password. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UserSummary createMemberAccount(NewAccount account) {
+        User user = create(TenantContext.requireId(), new RegisterUserCommand(account.email(), account.phoneNumber(),
+                account.password(), account.firstName(), account.lastName()), false);
+        // The official vouches for the address; the member proves they own the account by changing the password.
+        user.markEmailVerified(clock.instant());
+        user.requirePasswordChange();
+        return summary(user);
+    }
+
     private static UserSummary summary(User user) {
         return new UserSummary(user.getId(), user.getEmail(), user.isEmailVerified(), user.getPhoneNumber(),
                 user.getFirstName(), user.getLastName(), user.isEnabled());

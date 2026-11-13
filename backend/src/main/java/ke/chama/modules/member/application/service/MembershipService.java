@@ -3,27 +3,34 @@ package ke.chama.modules.member.application.service;
 import ke.chama.modules.audit.api.AuditEntry;
 import ke.chama.modules.audit.api.AuditTrail;
 import ke.chama.modules.auth.api.UserDirectory;
+import ke.chama.modules.auth.api.UserProvisioning;
+import ke.chama.modules.auth.api.UserProvisioning.NewAccount;
 import ke.chama.modules.auth.api.UserSummary;
 import ke.chama.modules.chama.api.ChamaDirectory;
 import ke.chama.modules.chama.api.ChamaSummary;
 import ke.chama.modules.chama.api.LicenseSummary;
 import ke.chama.modules.member.application.port.in.MemberViews.InvitationView;
+import ke.chama.modules.member.application.port.in.MemberViews.MemberKycView;
 import ke.chama.modules.member.application.port.in.MemberViews.MemberView;
 import ke.chama.modules.member.application.port.in.MemberViews.MyMembershipView;
 import ke.chama.modules.member.application.port.in.MembershipCommands;
 import ke.chama.modules.member.application.port.in.MembershipQueries;
+import ke.chama.modules.member.application.port.out.MemberKycRepository;
 import ke.chama.modules.member.application.port.out.MembershipRepository;
 import ke.chama.modules.member.application.port.out.RolePermissionRepository;
 import ke.chama.modules.member.domain.event.MemberInvited;
 import ke.chama.modules.member.domain.event.MembershipActivated;
+import ke.chama.modules.member.domain.exception.MemberExceptions.IdDocumentTakenException;
 import ke.chama.modules.member.domain.exception.MemberExceptions.LastChairpersonException;
 import ke.chama.modules.member.domain.exception.MemberExceptions.MemberAlreadyExistsException;
 import ke.chama.modules.member.domain.exception.MemberExceptions.MemberLimitReachedException;
 import ke.chama.modules.member.domain.exception.MemberExceptions.MembershipNotFoundException;
 import ke.chama.modules.member.domain.exception.MemberExceptions.SelfManagementNotAllowedException;
 import ke.chama.modules.member.domain.model.ChamaRole;
+import ke.chama.modules.member.domain.model.MemberKyc;
 import ke.chama.modules.member.domain.model.Membership;
 import ke.chama.modules.member.domain.model.MembershipStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,10 +39,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -56,7 +66,10 @@ public class MembershipService implements MembershipCommands, MembershipQueries 
     private final ChamaDirectory chamaDirectory;
     private final AuditTrail auditTrail;
     private final ApplicationEventPublisher events;
+    private final UserProvisioning provisioning;
+    private final MemberKycRepository kycRecords;
     private final Clock clock;
+    private final ZoneId zone;
 
     public MembershipService(MembershipRepository memberships,
                              RolePermissionRepository rolePermissions,
@@ -64,14 +77,20 @@ public class MembershipService implements MembershipCommands, MembershipQueries 
                              ChamaDirectory chamaDirectory,
                              AuditTrail auditTrail,
                              ApplicationEventPublisher events,
-                             Clock clock) {
+                             UserProvisioning provisioning,
+                             MemberKycRepository kycRecords,
+                             Clock clock,
+                             @Value("${chama.time-zone:Africa/Nairobi}") String timeZone) {
         this.memberships = memberships;
         this.rolePermissions = rolePermissions;
         this.userDirectory = userDirectory;
         this.chamaDirectory = chamaDirectory;
         this.auditTrail = auditTrail;
         this.events = events;
+        this.provisioning = provisioning;
+        this.kycRecords = kycRecords;
         this.clock = clock;
+        this.zone = ZoneId.of(timeZone);
     }
 
     // ---- commands -----------------------------------------------------------------------
@@ -90,6 +109,39 @@ public class MembershipService implements MembershipCommands, MembershipQueries 
         events.publishEvent(new MemberInvited(UUID.randomUUID(), now, chamaId, chama.name(), chama.code(),
                 normalized, inviterName));
         return new InvitationView(normalized, chama.code(), now);
+    }
+
+    @Override
+    public MemberView addMember(UUID chamaId, UUID actorUserId, NewMember member) {
+        Instant now = clock.instant();
+        requireRoomForAnotherMember(chamaId);
+        String email = member.email() == null ? "" : member.email().trim().toLowerCase(Locale.ROOT);
+        if (userDirectory.findByEmail(email).isPresent()) {
+            throw new MemberAlreadyExistsException(email);
+        }
+        requireUsableKyc(chamaId, null, member.kyc(), now);
+
+        UserSummary user = provisioning.createMemberAccount(new NewAccount(email, member.phoneNumber(),
+                member.temporaryPassword(), member.firstName(), member.lastName()));
+        // Flushed: the KYC row below is inserted with plain SQL and references the membership.
+        Membership membership = memberships.saveAndFlush(Membership.added(chamaId, user.id(), user.email(),
+                memberships.nextMemberNumber(chamaId), actorUserId, now));
+        kycRecords.save(chamaId, membership.getId(), member.kyc(), actorUserId, now);
+        audit(chamaId, actorUserId, "MEMBER_ADDED", membership,
+                Map.of("email", user.email(), "memberNumber", membership.getMemberNumber()));
+        return MemberView.of(membership, user);
+    }
+
+    @Override
+    public MemberKycView updateKyc(UUID chamaId, UUID membershipId, UUID actorUserId, MemberKyc kyc) {
+        Instant now = clock.instant();
+        Membership membership = load(chamaId, membershipId);
+        requireUsableKyc(chamaId, membershipId, kyc, now);
+        boolean existed = kycRecords.find(chamaId, membershipId).isPresent();
+        kycRecords.save(chamaId, membershipId, kyc, actorUserId, now);
+        // The audit log says that the record changed, not the identity data itself.
+        audit(chamaId, actorUserId, existed ? "MEMBER_KYC_UPDATED" : "MEMBER_KYC_RECORDED", membership, Map.of());
+        return MemberKycView.of(membershipId, kyc, actorUserId, now);
     }
 
     @Override
@@ -176,7 +228,22 @@ public class MembershipService implements MembershipCommands, MembershipQueries 
         return new MyMembershipView(view(membership), rolePermissions.effectivePermissions(chamaId, userId));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<MemberKycView> kyc(UUID chamaId, UUID membershipId) {
+        load(chamaId, membershipId);
+        return kycRecords.find(chamaId, membershipId)
+                .map(k -> MemberKycView.of(k.membershipId(), k.kyc(), k.updatedBy(), k.updatedAt()));
+    }
+
     // ---- helpers ------------------------------------------------------------------------
+
+    private void requireUsableKyc(UUID chamaId, UUID membershipId, MemberKyc kyc, Instant now) {
+        kyc.requireAdultOn(LocalDate.ofInstant(now, zone));
+        if (kycRecords.idDocumentTaken(chamaId, kyc.idType(), kyc.idNumber(), membershipId)) {
+            throw new IdDocumentTakenException();
+        }
+    }
 
     private Membership load(UUID chamaId, UUID membershipId) {
         return memberships.findByIdAndChamaId(membershipId, chamaId)

@@ -132,7 +132,8 @@ Default mapping for a new chama (✓ = granted):
 | Permission | MEMBER | TREASURER | SECRETARY | CHAIRPERSON | AUDITOR | ADMIN | Unlocks |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|---|
 | `CHAMA_VIEW` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Chama profile, licence |
-| `CHAMA_SETTINGS_MANAGE` | | | | ✓ | | ✓ | Chama settings, opening-balance import |
+| `CHAMA_SETTINGS_MANAGE` | | | | ✓ | | ✓ | Chama settings |
+| `DATA_IMPORT` | | ✓ | | ✓ | | ✓ | Import opening balances and history from Excel |
 | `MEMBER_VIEW` | | ✓ | ✓ | ✓ | ✓ | ✓ | Member directory, roles list |
 | `MEMBER_INVITE` | | | ✓ | ✓ | | ✓ | Add members directly, invite by email, keep KYC details |
 | `MEMBER_APPROVE` | | | | ✓ | | ✓ | Approve/reject applications |
@@ -597,7 +598,8 @@ Navigation groups. Show an item only if its permission and feature checks pass. 
 | | Roles & permissions | `/settings/roles` | `MEMBER_VIEW`; edit: `ROLE_PERMISSIONS_MANAGE` | — |
 | | Savings products | `/settings/savings-products` | active member; edit: `PRODUCTS_MANAGE` | CONTRIBUTIONS |
 | | Loan products | `/settings/loan-products` | active member; edit: `PRODUCTS_MANAGE` | LOANS |
-| | Import opening balances | `/settings/import` | `CHAMA_SETTINGS_MANAGE` | — |
+| | Import history | `/settings/import-history` | `DATA_IMPORT` | — |
+| | Import opening balances | `/settings/import` | `DATA_IMPORT` | — |
 | **Account** (user menu) | Profile & security | `/profile` | any signed-in user | — |
 | | Sign out / sign out everywhere | — | — | — |
 
@@ -997,7 +999,7 @@ cells; save per role (`PUT /roles/{role}/permissions` with the full set). Lock t
 permissions (disabled, tooltip). Confirm before saving: "Changes apply immediately to everyone with this role."
 After saving, re-fetch `/members/me`.
 
-**Import opening balances** (`/settings/import`, `CHAMA_SETTINGS_MANAGE`): a wizard.
+**Import opening balances** (`/settings/import`, `DATA_IMPORT`): a wizard.
 1. `GET /imports/opening-balances`: if `data` is not null, show the completed import (as-of,
    file, by, summary, warnings) and stop; imports happen once.
 2. Explain: create savings products first; download the template (`GET …/template` as Blob with

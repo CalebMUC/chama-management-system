@@ -31,8 +31,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Bringing a chama's history over from Excel, one file per kind. Chairperson by default
- * (CHAMA_SETTINGS_MANAGE). {kind} is setup, contributions, loans, penalties, investments,
+ * Bringing a chama's history over from Excel, one file per kind. Needs DATA_IMPORT: the treasurer,
+ * chairperson and admin by default. {kind} is setup, contributions, loans, penalties, investments,
  * expenses or reconciliation.
  * <pre>
  * GET  /api/v1/imports/history/{kind}/template     the .xlsx template
@@ -56,7 +56,7 @@ class HistoryImportController {
     @Operation(summary = "Download a template",
             description = "An .xlsx workbook with instructions, the sheets to fill in and the chama's members and products.")
     @GetMapping("/{kind}/template")
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ResponseEntity<byte[]> template(@PathVariable String kind) {
         Kind k = kind(kind);
         return ResponseEntity.ok()
@@ -70,7 +70,7 @@ class HistoryImportController {
             description = "Checks every row and lists each problem with its sheet, row and column, with the totals "
                     + "that would be imported. Nothing is saved.")
     @PostMapping(path = "/{kind}/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ApiResponse<PreviewView> preview(@PathVariable String kind, @RequestParam("file") MultipartFile file) {
         PreviewView preview = imports.preview(TenantContext.requireChama(), kind(kind), bytes(file));
         return ApiResponse.ok(preview, preview.importable() ? "Ready to import"
@@ -80,7 +80,7 @@ class HistoryImportController {
     @Operation(summary = "Import a file", description = "Imports every row as one batch, all or nothing. No emails are sent.")
     @PostMapping(path = "/{kind}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ApiResponse<BatchView> importFile(@PathVariable String kind, @RequestParam("file") MultipartFile file) {
         return ApiResponse.ok(imports.importFile(TenantContext.requireChama(), CurrentUser.id(), kind(kind),
                 file.getOriginalFilename(), bytes(file)), "Imported");
@@ -88,7 +88,7 @@ class HistoryImportController {
 
     @Operation(summary = "Every import, newest first")
     @GetMapping("/batches")
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ApiResponse<List<BatchView>> batches() {
         return ApiResponse.ok(imports.batches(TenantContext.requireChama()));
     }
@@ -96,7 +96,7 @@ class HistoryImportController {
     @Operation(summary = "Undo the latest import",
             description = "Removes what it created and reverses its ledger entries (dated as the originals).")
     @PostMapping("/batches/{id}/undo")
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ApiResponse<BatchView> undo(@PathVariable UUID id) {
         return ApiResponse.ok(imports.undo(TenantContext.requireChama(), CurrentUser.id(), id), "Import undone");
     }

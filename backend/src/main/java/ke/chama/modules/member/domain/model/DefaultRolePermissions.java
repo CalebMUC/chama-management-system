@@ -14,7 +14,8 @@ import static ke.chama.shared.security.ChamaPermission.*;
  * The permissions every new chama starts with. The chairperson can change them per chama
  * afterwards, within the limits of {@link #LOCKED_FOR_CHAIRPERSON}.
  * <p>
- * Built for separation of duties: the treasurer records money and creates expenses; the
+ * Built for separation of duties: the treasurer records money, creates expenses and imports the
+ * chama's records from Excel; the
  * chairperson and secretary approve expenses and investments (two approvers, for the default
  * quorum of two); the secretary handles membership; the auditor sees everything and changes nothing;
  * the admin runs operations (members, roles, settings, products) without touching money.
@@ -45,7 +46,7 @@ public final class DefaultRolePermissions {
                 MEMBER_VIEW, CONTRIBUTION_VIEW_ALL, CONTRIBUTION_RECORD, CONTRIBUTION_REVERSE,
                 LOAN_VIEW_ALL, LOAN_APPROVE, LOAN_DISBURSE, LOAN_REPAYMENT_RECORD,
                 PENALTY_VIEW_ALL, PENALTY_RECORD, EXPENSE_CREATE, INVESTMENT_MANAGE, LEDGER_VIEW, LEDGER_POST, LEDGER_ACCOUNTS_MANAGE,
-                REPORT_VIEW_ALL, PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE)));
+                REPORT_VIEW_ALL, PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE, DATA_IMPORT)));
 
         DEFAULTS.put(ChamaRole.SECRETARY, union(EVERY_MEMBER, EnumSet.of(
                 MEMBER_VIEW, MEMBER_INVITE, CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, EXPENSE_APPROVE, INVESTMENT_APPROVE,
@@ -63,7 +64,7 @@ public final class DefaultRolePermissions {
         DEFAULTS.put(ChamaRole.ADMIN, union(EVERY_MEMBER, EnumSet.of(
                 CHAMA_SETTINGS_MANAGE, MEMBER_VIEW, MEMBER_INVITE, MEMBER_APPROVE, MEMBER_SUSPEND, MEMBER_ROLES_MANAGE,
                 CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, REPORT_VIEW_ALL, AUDIT_LOG_VIEW,
-                PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE)));
+                PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE, DATA_IMPORT)));
     }
 
     private DefaultRolePermissions() {

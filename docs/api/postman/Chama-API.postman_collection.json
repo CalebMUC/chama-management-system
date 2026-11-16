@@ -3862,7 +3862,7 @@
           }
         }
       ],
-      "description": "Bring the chama's records over from Excel. Chairperson by default (CHAMA_SETTINGS_MANAGE)."
+      "description": "Bring the chama's records over from Excel. Needs DATA_IMPORT: treasurer, chairperson and admin by default."
     },
     {
       "name": "Ledger",

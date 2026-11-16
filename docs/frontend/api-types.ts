@@ -105,6 +105,8 @@ export type ChamaRole = 'MEMBER' | 'TREASURER' | 'SECRETARY' | 'CHAIRPERSON' | '
 export type ChamaPermission =
   | 'CHAMA_VIEW'
   | 'CHAMA_SETTINGS_MANAGE'
+  /** Import opening balances and history from Excel, and undo a history import. */
+  | 'DATA_IMPORT'
   | 'MEMBER_VIEW'
   | 'MEMBER_INVITE'
   | 'MEMBER_APPROVE'
@@ -140,7 +142,7 @@ export type ChamaPermission =
   | 'PAYMENT_SUBMIT';
 
 export const ALL_PERMISSIONS: readonly ChamaPermission[] = [
-  'CHAMA_VIEW', 'CHAMA_SETTINGS_MANAGE',
+  'CHAMA_VIEW', 'CHAMA_SETTINGS_MANAGE', 'DATA_IMPORT',
   'MEMBER_VIEW', 'MEMBER_INVITE', 'MEMBER_APPROVE', 'MEMBER_SUSPEND', 'MEMBER_ROLES_MANAGE', 'ROLE_PERMISSIONS_MANAGE',
   'CONTRIBUTION_VIEW_ALL', 'CONTRIBUTION_RECORD', 'CONTRIBUTION_REVERSE',
   'LOAN_APPLY', 'LOAN_VIEW_ALL', 'LOAN_APPROVE', 'LOAN_DISBURSE', 'LOAN_REPAYMENT_RECORD',

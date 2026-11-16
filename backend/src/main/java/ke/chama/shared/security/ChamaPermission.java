@@ -13,6 +13,8 @@ package ke.chama.shared.security;
 public enum ChamaPermission {
     CHAMA_VIEW,
     CHAMA_SETTINGS_MANAGE,
+    /** Import the chama's opening balances and history from Excel, and undo a history import. */
+    DATA_IMPORT,
 
     MEMBER_VIEW,
     MEMBER_INVITE,

@@ -20,7 +20,7 @@ class DefaultRolePermissionsTest {
     @Test
     void treasurerRecordsMoneyButCannotApproveExpensesOrManageMembers() {
         assertThat(DefaultRolePermissions.forRole(ChamaRole.TREASURER))
-                .contains(CONTRIBUTION_RECORD, LOAN_DISBURSE, EXPENSE_CREATE, LEDGER_VIEW)
+                .contains(CONTRIBUTION_RECORD, LOAN_DISBURSE, EXPENSE_CREATE, LEDGER_VIEW, DATA_IMPORT)
                 .doesNotContain(EXPENSE_APPROVE, PENALTY_WAIVE, MEMBER_ROLES_MANAGE, CHAMA_SETTINGS_MANAGE);
     }
 
@@ -47,7 +47,10 @@ class DefaultRolePermissionsTest {
                         INVESTMENT_MANAGE, INVESTMENT_APPROVE, LEDGER_POST, PENALTY_WAIVE, ROLE_PERMISSIONS_MANAGE);
     }
 
-    /** V22 grants ADMIN to chamas that existed before it; new chamas get DefaultRolePermissions. Keep them equal. */
+    /**
+     * V22 grants ADMIN to chamas that existed before it, and V25 adds DATA_IMPORT to every role holding
+     * CHAMA_SETTINGS_MANAGE; new chamas get DefaultRolePermissions. Keep them equal.
+     */
     @Test
     void theAdminMigrationGrantsTheSameDefaults() throws Exception {
         String sql;
@@ -57,8 +60,20 @@ class DefaultRolePermissionsTest {
         java.util.Set<String> granted = java.util.regex.Pattern.compile("\\('([A-Z_]+)'\\)")
                 .matcher(sql.substring(sql.indexOf("CROSS JOIN")))
                 .results().map(m -> m.group(1)).collect(java.util.stream.Collectors.toSet());
+        assertThat(granted).contains("CHAMA_SETTINGS_MANAGE");
+        granted.add("DATA_IMPORT");
         assertThat(granted).isEqualTo(DefaultRolePermissions.forRole(ChamaRole.ADMIN).stream()
                 .map(Enum::name).collect(java.util.stream.Collectors.toSet()));
+    }
+
+    /** V25 grants DATA_IMPORT to existing chamas: wherever CHAMA_SETTINGS_MANAGE is held, and to the treasurer. */
+    @Test
+    void dataImportGoesWhereChamaSettingsWentPlusTheTreasurer() {
+        for (ChamaRole role : ChamaRole.values()) {
+            boolean expected = role == ChamaRole.TREASURER
+                    || DefaultRolePermissions.forRole(role).contains(CHAMA_SETTINGS_MANAGE);
+            assertThat(DefaultRolePermissions.forRole(role).contains(DATA_IMPORT)).as(role.name()).isEqualTo(expected);
+        }
     }
 
     @Test

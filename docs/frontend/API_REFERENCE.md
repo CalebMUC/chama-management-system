@@ -768,7 +768,7 @@ Errors: `REPORT_INVALID_PERIOD` (`to` before `from`), `REPORT_NOT_A_CASH_ACCOUNT
 
 ## 17. Opening-balance import (`/api/v1/imports/opening-balances`)
 
-For a chama moving from Excel. Permission `CHAMA_SETTINGS_MANAGE` on all four. Done once per chama, all-or-nothing.
+For a chama moving from Excel. Permission `DATA_IMPORT` on all four. Done once per chama, all-or-nothing.
 
 ### GET `/imports/opening-balances/template`
 - → `200` **binary** `.xlsx` (`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `Content-Disposition: attachment; filename="opening-balances-template.xlsx"`). Not wrapped in the JSON envelope. Fetch with the bearer header as a Blob and trigger a download. Has sheets Members, Loans, Accounts, Investments, with one savings column per savings product (create products first).
@@ -790,7 +790,7 @@ Checks every row; saves nothing.
 
 ## 17a. History import (`/api/v1/imports/history`)
 
-For a chama that ran for years before using the system: every contribution, loan, penalty, investment and expense, each on its own date. Permission `CHAMA_SETTINGS_MANAGE` on all. One Excel file per step; `{kind}` is the step's slug, in this order:
+For a chama that ran for years before using the system: every contribution, loan, penalty, investment and expense, each on its own date. Permission `DATA_IMPORT` on all. One Excel file per step; `{kind}` is the step's slug, in this order:
 
 | # | `{kind}` | What it brings in |
 |---|---|---|

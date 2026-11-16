@@ -383,7 +383,7 @@ items = [
                   {"key": "asOf", "value": "2026-10-31", "type": "text", "description": "The cut-over date"}],
             desc="Once per chama, all or nothing. New members get a welcome email to set their password."),
         req("Import status", "GET", "/api/v1/imports/opening-balances"),
-    ], desc="Bring the chama's records over from Excel. Chairperson by default (CHAMA_SETTINGS_MANAGE)."),
+    ], desc="Bring the chama's records over from Excel. Needs DATA_IMPORT: treasurer, chairperson and admin by default."),
 
     folder("Ledger", [
         req("Chart of accounts", "GET", "/api/v1/ledger/accounts",

@@ -30,7 +30,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * Bringing a chama's records over from Excel. Chairperson by default (CHAMA_SETTINGS_MANAGE).
+ * Bringing a chama's records over from Excel. Needs DATA_IMPORT: the treasurer,
+ * chairperson and admin by default.
  * <pre>
  * GET  /api/v1/imports/opening-balances/template   the .xlsx template
  * POST /api/v1/imports/opening-balances/preview    multipart: file, asOf - checks every row, saves nothing
@@ -55,7 +56,7 @@ class OpeningBalanceImportController {
             description = "An .xlsx workbook with instructions and the Members, Loans, Accounts and Investments sheets. "
                     + "Members has a savings column per savings product (add products before downloading).")
     @GetMapping("/template")
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ResponseEntity<byte[]> template() {
         return ResponseEntity.ok()
                 .contentType(XLSX)
@@ -68,7 +69,7 @@ class OpeningBalanceImportController {
             description = "Checks every row against the chama and lists each problem with its sheet, row and column, "
                     + "with the totals that would be brought forward. Nothing is saved.")
     @PostMapping(path = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ApiResponse<PreviewView> preview(@RequestParam("file") MultipartFile file,
                                      @RequestParam("asOf") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
         PreviewView preview = imports.preview(chama(), bytes(file), asOf);
@@ -81,7 +82,7 @@ class OpeningBalanceImportController {
                     + "dated the cut-over day, and records the loans, penalties and investments. Done once; all or nothing.")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ApiResponse<ImportView> importBalances(@RequestParam("file") MultipartFile file,
                                            @RequestParam("asOf") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
         UUID chamaId = chama();
@@ -91,7 +92,7 @@ class OpeningBalanceImportController {
 
     @Operation(summary = "The import, if done")
     @GetMapping
-    @RequiresChamaPermission(ChamaPermission.CHAMA_SETTINGS_MANAGE)
+    @RequiresChamaPermission(ChamaPermission.DATA_IMPORT)
     ApiResponse<ImportView> imported() {
         return imports.imported(chama())
                 .map(view -> ApiResponse.ok(view, "Opening balances imported as at " + view.asOf()))

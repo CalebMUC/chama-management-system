@@ -16,6 +16,9 @@ public interface MemberDirectory {
     /** The member, if seated. */
     Optional<MemberSummary> seatedMember(UUID chamaId, UUID userId);
 
+    /** The member whatever their status now, e.g. one who has left; for names on old records. */
+    Optional<MemberSummary> anyMember(UUID chamaId, UUID userId);
+
     /** How many memberships are in each state that matters day to day. */
     MembershipCounts counts(UUID chamaId);
 

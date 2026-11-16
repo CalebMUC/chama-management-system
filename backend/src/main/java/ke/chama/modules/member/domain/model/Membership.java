@@ -72,6 +72,15 @@ public class Membership extends AggregateRoot {
     @Column(name = "suspension_reason", length = 500)
     private String suspensionReason;
 
+    @Column(name = "exited_at")
+    private Instant exitedAt;
+
+    @Column(name = "exited_by")
+    private UUID exitedBy;
+
+    @Column(name = "exit_reason", length = 300)
+    private String exitReason;
+
     /** Required by JPA. */
     protected Membership() {
     }
@@ -161,6 +170,21 @@ public class Membership extends AggregateRoot {
         this.suspensionReason = null;
     }
 
+    /**
+     * The member leaves the chama once their exit settlement is paid out. They keep their member
+     * number and roles on record, but hold no permissions and owe nothing from now on.
+     */
+    public void exit(UUID by, String reason, Instant at) {
+        if (status != MembershipStatus.ACTIVE && status != MembershipStatus.SUSPENDED) {
+            throw new InvalidMembershipStateException("exit", status);
+        }
+        this.status = MembershipStatus.EXITED;
+        this.exitedBy = Objects.requireNonNull(by, "by");
+        this.exitedAt = Objects.requireNonNull(at, "at");
+        String why = reason == null ? "" : reason.trim();
+        this.exitReason = why.isEmpty() ? null : why.length() > 300 ? why.substring(0, 300) : why;
+    }
+
     /** Replaces the roles. MEMBER is always kept. Only for ACTIVE memberships. */
     public void changeRoles(Set<ChamaRole> newRoles) {
         requireStatus("change the roles of", MembershipStatus.ACTIVE);
@@ -245,5 +269,17 @@ public class Membership extends AggregateRoot {
 
     public String getSuspensionReason() {
         return suspensionReason;
+    }
+
+    public Instant getExitedAt() {
+        return exitedAt;
+    }
+
+    public UUID getExitedBy() {
+        return exitedBy;
+    }
+
+    public String getExitReason() {
+        return exitReason;
     }
 }

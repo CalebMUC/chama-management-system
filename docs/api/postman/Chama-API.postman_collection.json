@@ -153,6 +153,11 @@
       "type": "string"
     },
     {
+      "key": "exitId",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "investmentId",
       "value": "",
       "type": "string"
@@ -1300,6 +1305,315 @@
           }
         }
       ]
+    },
+    {
+      "name": "Member exits",
+      "item": [
+        {
+          "name": "Preview a member's exit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits/preview?memberUserId={{memberUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits",
+                "preview"
+              ],
+              "query": [
+                {
+                  "key": "memberUserId",
+                  "value": "{{memberUserId}}",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Treasurer (MEMBER_EXIT_REQUEST). Refundable savings paid back less loans and penalties; non-refundable savings kept by the chama; no dividend for the year. Lists what blocks the exit, e.g. guarantees to transfer first."
+          }
+        },
+        {
+          "name": "Start an exit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberUserId\": \"{{memberUserId}}\",\n  \"reason\": \"Relocating to Mombasa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Works out the settlement and sends it for approval by the quorum. Not for your own exit."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data.id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('exitId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List exits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING_APPROVAL",
+                  "disabled": true
+                },
+                {
+                  "key": "memberUserId",
+                  "value": "{{memberUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "size",
+                  "value": "50",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  const v = (() => { try { return j.data[0].id; } catch (e) { return undefined; } })();",
+                  "  if (v !== undefined && v !== null) pm.collectionVariables.set('exitId', v);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My exits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits",
+                "mine"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "One exit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits/{{exitId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits",
+                "{{exitId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits/{{exitId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits",
+                "{{exitId}}",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Agreed at the AGM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Chairperson or secretary by default (MEMBER_EXIT_APPROVE); not whoever started it, not the member."
+          }
+        },
+        {
+          "name": "Reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits/{{exitId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits",
+                "{{exitId}}",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Settle the welfare dispute first\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits/{{exitId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits",
+                "{{exitId}}",
+                "cancel"
+              ]
+            },
+            "description": "Only whoever started it."
+          }
+        },
+        {
+          "name": "Settle (pay out)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/member-exits/{{exitId}}/settle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-exits",
+                "{{exitId}}",
+                "settle"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"MPESA\",\n  \"reference\": \"QKEXIT{{$timestamp}}\",\n  \"settledOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Treasurer (MEMBER_EXIT_SETTLE). Clears loans and penalties from savings, moves non-refundable savings to retained surplus, pays out the rest, closes the accounts and ends the membership. Method and reference only when something is paid out."
+          }
+        }
+      ],
+      "description": "A member leaving the chama. Requests use {{officialToken}}: log in as the right official."
     },
     {
       "name": "Contributions",
@@ -2753,6 +3067,43 @@
                 }
               ]
             }
+          }
+        },
+        {
+          "name": "Transfer a guarantee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loans/{{loanId}}/guarantors/{{guarantorUserId}}/replace",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loans",
+                "{{loanId}}",
+                "guarantors",
+                "{{guarantorUserId}}",
+                "replace"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newGuarantorUserId\": \"{{memberUserId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Asks another active member to take over {{guarantorUserId}}'s guarantee, e.g. because they are leaving the chama. The borrower, that guarantor or an official with LOAN_APPROVE may ask. The new member answers with 'Answer a guarantee request'; accepting releases the old guarantor."
           }
         },
         {

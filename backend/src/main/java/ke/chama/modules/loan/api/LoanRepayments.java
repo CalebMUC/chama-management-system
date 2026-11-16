@@ -1,6 +1,7 @@
 package ke.chama.modules.loan.api;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,8 +19,20 @@ public interface LoanRepayments {
     void recordRepayment(UUID chamaId, UUID officialUserId, UUID loanId, long amountMinor, String method,
                          String reference, LocalDate paidOn);
 
+    /**
+     * Clears (part of) what a member who is leaving the chama owes on an active loan from their own
+     * savings: each source names a savings product's member-ledger account and how much to take from
+     * the borrower's balance there. Recorded as a repayment with method SAVINGS. Runs in the caller's
+     * transaction, which must exist.
+     */
+    void repayFromSavings(UUID chamaId, UUID officialUserId, UUID loanId, List<SavingsSource> sources, LocalDate paidOn);
+
     /** A loan repayment or disbursement already carries this reference. */
     boolean referenceUsed(UUID chamaId, String method, String reference);
+
+    /** How much to take from the borrower's balance on one savings account (by ledger account code). */
+    record SavingsSource(String accountCode, long amountMinor) {
+    }
 
     /**
      * @param status PENDING_GUARANTORS, PENDING_APPROVAL, APPROVED, ACTIVE, REPAID, REJECTED or CANCELLED

@@ -213,6 +213,75 @@ Replaces one role's permission set, effective immediately for everyone holding i
 
 ---
 
+## 3a. Member exits (`/api/v1/member-exits`)
+
+A member leaves through a settlement that officials approve. No licence feature needed.
+Lifecycle (maker-checker, like expenses): `PENDING_APPROVAL → APPROVED → SETTLED`, or `REJECTED` / `CANCELLED` before payout.
+
+**The settlement** (`ExitSettlementView`):
+- refundable savings (products with `refundableOnExit`, e.g. deposits) are paid back, **less** the member's outstanding
+  loans and unpaid penalties, which are cleared from those savings first (recorded as repayments with method `SAVINGS`);
+- non-refundable savings (e.g. share capital, welfare) are **kept by the chama** (moved to 3000 Retained surplus);
+- **no dividend** is paid for the year the member leaves (`dividendMinor` is always 0);
+- `payoutMinor = refundableMinor − loansMinor − penaltiesMinor`.
+
+**What blocks an exit** (listed in `blockers`; `POST` fails with `EXIT_BLOCKED` while any remain):
+- the member guarantees another member's open loan: transfer the guarantee first
+  (`POST /loans/{loanId}/guarantors/{guarantorUserId}/replace`, then the new guarantor accepts);
+- the member has been asked to guarantee a loan and has not answered;
+- a loan application of theirs is still in progress (cancel or reject it);
+- they owe more than their refundable savings (`shortfallMinor`; they pay it first);
+- they are the chama's only active chairperson;
+- an exit of theirs is already in progress.
+
+Default permissions: the treasurer (or admin) starts an exit, the chairperson and secretary approve it, the treasurer
+pays it out. Nobody handles their own exit; whoever started an exit cannot approve or reject it.
+
+### GET `/member-exits/preview?memberUserId=`
+The settlement if the member left today, and anything that stops them. Show it before starting an exit.
+- Permission: `MEMBER_EXIT_REQUEST` → `200 ExitPreviewView` · Errors: `EXIT_NOT_A_MEMBER` (404, not active or suspended)
+
+### POST `/member-exits`
+Works out the settlement now and sends it for approval by the chama's quorum.
+- Permission: `MEMBER_EXIT_REQUEST` · Body: `StartExitRequest` `{ "memberUserId": "…", "reason": "Relocating to Mombasa" }`
+- → `201 ExitView` — "Exit started; the settlement awaits approval"
+- Errors: `EXIT_BLOCKED` (422; message joins every blocker), `EXIT_IN_PROGRESS` (409), `EXIT_SELF_HANDLING` (403, your own exit),
+  `EXIT_NOT_A_MEMBER` (404), `EXIT_INVALID`
+
+### GET `/member-exits`
+- Permission: `MEMBER_VIEW` · Query: `status?: ExitStatus`, `memberUserId?`, `page`, `size` → `200 Paged<ExitView>` (newest first)
+
+### GET `/member-exits/mine`
+- Permission: active member → `200 ExitView[]` (the caller's own exits, newest first)
+
+### GET `/member-exits/{exitId}`
+- Permission: `MEMBER_VIEW` → `200 ExitView` · Errors: `EXIT_NOT_FOUND`
+
+### POST `/member-exits/{exitId}/approve`
+- Permission: `MEMBER_EXIT_APPROVE` · Body (optional): `{ "note": "..." }`
+- → `200 ExitView` — "Exit approved" / "Approval recorded (1 of 2)"
+- Errors: `EXIT_SELF_HANDLING` (you started it, or it is your own), `EXIT_ALREADY_APPROVED` (409), `EXIT_WRONG_STATUS`
+
+### POST `/member-exits/{exitId}/reject`
+- Permission: `MEMBER_EXIT_APPROVE` · Body: `{ "reason": "..." }` → `200 ExitView` — "Exit rejected"
+- Errors: `EXIT_SELF_HANDLING`, `EXIT_WRONG_STATUS`
+
+### POST `/member-exits/{exitId}/cancel`
+Only whoever started it, before payout.
+- Permission: `MEMBER_EXIT_REQUEST` · Body: none → `200 ExitView` — "Exit cancelled" · Errors: `EXIT_NOT_REQUESTER`, `EXIT_WRONG_STATUS`
+
+### POST `/member-exits/{exitId}/settle`
+Pays out an `APPROVED` exit: clears loans and penalties from savings, moves non-refundable savings to the chama, pays
+the rest out, closes the member's accounts and sets the membership to `EXITED`. The figures must be exactly as approved.
+- Permission: `MEMBER_EXIT_SETTLE` · Body: `ExitSettleRequest` `{ "method": "MPESA", "reference": "QK8...", "settledOn": "2026-11-16" }`;
+  method and reference are needed only when `payoutMinor > 0` (body may be omitted otherwise)
+- → `200 ExitView` — "Exit settled; the member has left the chama"
+- Errors: `EXIT_SETTLEMENT_CHANGED` (409: savings, loans or penalties changed since approval; reject or cancel and start again),
+  `EXIT_BLOCKED` (422), `EXIT_INSUFFICIENT_FUNDS` (422), `EXIT_DUPLICATE_REFERENCE` (409), `EXIT_SELF_HANDLING`,
+  `EXIT_WRONG_STATUS`, `EXIT_INVALID`, `MEMBER_LAST_CHAIRPERSON`
+
+---
+
 ## 4. Contributions (`/api/v1/contributions`) · Feature `CONTRIBUTIONS`
 
 Periods are opened automatically (and missed ones caught up) whenever contributions are used.
@@ -421,7 +490,8 @@ Loans the caller was asked to guarantee.
 - Permission: active member → `200 GuaranteeView[]`
 
 #### POST `/loans/{loanId}/guarantee`
-The guarantor's answer.
+The guarantor's answer. Also answers a request to take over another guarantor's guarantee (`replacesUserId` set on the
+caller's `GuarantorView`): accepting releases that guarantor (`RELEASED`), on a loan in any open status.
 - Permission: active member (must be a requested guarantor) · Body: `GuaranteeResponseRequest` `{ "accept": true }`
 - → `200 LoanDetailView` — "You are now a guarantor of this loan" / "You declined to guarantee this loan"
 - Errors: `LOAN_NOT_GUARANTOR` (403), `LOAN_GUARANTOR_RESPONDED` (409), `LOAN_WRONG_STATUS`
@@ -430,6 +500,16 @@ The guarantor's answer.
 Borrower names another guarantor (e.g. after a decline), while the loan is `PENDING_GUARANTORS`.
 - Permission: active member (borrower only) · Body: `AddGuarantorRequest` `{ "guarantorUserId": "…" }`
 - → `200 LoanDetailView` — "Guarantor asked" · Errors: `LOAN_NOT_BORROWER`, `LOAN_WRONG_STATUS`, `LOAN_INVALID`, `LOAN_MEMBER_NOT_FOUND`
+
+#### POST `/loans/{loanId}/guarantors/{guarantorUserId}/replace`
+Transfers a guarantee to another active member, e.g. because the guarantor is leaving the chama (a guarantor cannot
+leave while they guarantee an open loan). The new member is asked by email and must accept; the outgoing guarantor
+stays liable until then, and becomes `RELEASED` once they do. One replacement request per guarantor at a time.
+- Permission: the borrower, the guarantor being replaced, or an official with `LOAN_APPROVE`
+- Body: `ReplaceGuarantorRequest` `{ "newGuarantorUserId": "…" }`
+- → `200 LoanDetailView` — "New guarantor asked to take over the guarantee"
+- Errors: `LOAN_GUARANTEE_TRANSFER_NOT_ALLOWED` (403), `LOAN_WRONG_STATUS` (loan repaid, rejected or cancelled),
+  `LOAN_INVALID` (not an accepted guarantor, already a guarantor, the borrower, a request already pending), `LOAN_MEMBER_NOT_FOUND`
 
 #### POST `/loans/{loanId}/cancel`
 Borrower withdraws before disbursement.

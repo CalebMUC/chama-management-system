@@ -22,6 +22,12 @@ public enum ChamaPermission {
     MEMBER_SUSPEND,
     MEMBER_ROLES_MANAGE,
     ROLE_PERMISSIONS_MANAGE,
+    /** Start a member's exit (which works out their settlement) and cancel an exit you started. */
+    MEMBER_EXIT_REQUEST,
+    /** Approve or reject a member's exit settlement (never one you started, never your own). */
+    MEMBER_EXIT_APPROVE,
+    /** Pay out an approved exit settlement, which closes the member's accounts and ends their membership. */
+    MEMBER_EXIT_SETTLE,
 
     CONTRIBUTION_VIEW_ALL,
     CONTRIBUTION_RECORD,

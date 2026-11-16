@@ -18,7 +18,9 @@ import static ke.chama.shared.security.ChamaPermission.*;
  * chama's records from Excel; the
  * chairperson and secretary approve expenses and investments (two approvers, for the default
  * quorum of two); the secretary handles membership; the auditor sees everything and changes nothing;
- * the admin runs operations (members, roles, settings, products) without touching money.
+ * the admin runs operations (members, roles, settings, products) without touching money. A member's
+ * exit follows the same split: the treasurer or admin starts it, the chairperson and secretary
+ * approve the settlement, the treasurer pays it out.
  */
 public final class DefaultRolePermissions {
 
@@ -46,11 +48,12 @@ public final class DefaultRolePermissions {
                 MEMBER_VIEW, CONTRIBUTION_VIEW_ALL, CONTRIBUTION_RECORD, CONTRIBUTION_REVERSE,
                 LOAN_VIEW_ALL, LOAN_APPROVE, LOAN_DISBURSE, LOAN_REPAYMENT_RECORD,
                 PENALTY_VIEW_ALL, PENALTY_RECORD, EXPENSE_CREATE, INVESTMENT_MANAGE, LEDGER_VIEW, LEDGER_POST, LEDGER_ACCOUNTS_MANAGE,
-                REPORT_VIEW_ALL, PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE, DATA_IMPORT)));
+                REPORT_VIEW_ALL, PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE, DATA_IMPORT,
+                MEMBER_EXIT_REQUEST, MEMBER_EXIT_SETTLE)));
 
         DEFAULTS.put(ChamaRole.SECRETARY, union(EVERY_MEMBER, EnumSet.of(
                 MEMBER_VIEW, MEMBER_INVITE, CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, EXPENSE_APPROVE, INVESTMENT_APPROVE,
-                REPORT_VIEW_ALL, AUDIT_LOG_VIEW, MEMBER_ACCOUNTS_VIEW_ALL)));
+                REPORT_VIEW_ALL, AUDIT_LOG_VIEW, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_EXIT_APPROVE)));
 
         DEFAULTS.put(ChamaRole.CHAIRPERSON, EnumSet.allOf(ChamaPermission.class));
 
@@ -64,7 +67,7 @@ public final class DefaultRolePermissions {
         DEFAULTS.put(ChamaRole.ADMIN, union(EVERY_MEMBER, EnumSet.of(
                 CHAMA_SETTINGS_MANAGE, MEMBER_VIEW, MEMBER_INVITE, MEMBER_APPROVE, MEMBER_SUSPEND, MEMBER_ROLES_MANAGE,
                 CONTRIBUTION_VIEW_ALL, LOAN_VIEW_ALL, PENALTY_VIEW_ALL, REPORT_VIEW_ALL, AUDIT_LOG_VIEW,
-                PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE, DATA_IMPORT)));
+                PRODUCTS_MANAGE, MEMBER_ACCOUNTS_VIEW_ALL, MEMBER_ACCOUNTS_MANAGE, DATA_IMPORT, MEMBER_EXIT_REQUEST)));
     }
 
     private DefaultRolePermissions() {

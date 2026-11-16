@@ -63,6 +63,10 @@ public final class LoanRequests {
     public record AddGuarantorRequest(@NotNull UUID guarantorUserId) {
     }
 
+    /** E.g. {@code {"newGuarantorUserId":"..."}}. */
+    public record ReplaceGuarantorRequest(@NotNull UUID newGuarantorUserId) {
+    }
+
     public record GuaranteeResponse(@NotNull Boolean accept) {
     }
 

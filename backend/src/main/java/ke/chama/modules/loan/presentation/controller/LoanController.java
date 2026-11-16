@@ -13,6 +13,7 @@ import ke.chama.modules.loan.application.port.in.LoanUseCases.LoanView;
 import ke.chama.modules.loan.application.port.in.LoanUseCases.MyLoansView;
 import ke.chama.modules.loan.domain.model.Loan;
 import ke.chama.modules.loan.presentation.dto.request.LoanRequests.AddGuarantorRequest;
+import ke.chama.modules.loan.presentation.dto.request.LoanRequests.ReplaceGuarantorRequest;
 import ke.chama.modules.loan.presentation.dto.request.LoanRequests.ApplyRequest;
 import ke.chama.modules.loan.presentation.dto.request.LoanRequests.ApproveRequest;
 import ke.chama.modules.loan.presentation.dto.request.LoanRequests.DisburseRequest;
@@ -55,6 +56,8 @@ import java.util.UUID;
  * GET  /api/v1/loans/guarantees         active member          loans I was asked to guarantee
  * POST /api/v1/loans/{id}/guarantee     active member          {accept} - the guarantor's answer
  * POST /api/v1/loans/{id}/guarantors    active member          {guarantorUserId} - the borrower names another
+ * POST /api/v1/loans/{id}/guarantors/{guarantorUserId}/replace
+ *                                       borrower, that guarantor or LOAN_APPROVE   {newGuarantorUserId}
  * POST /api/v1/loans/{id}/cancel        active member          the borrower withdraws, before disbursement
  * GET  /api/v1/loans                    LOAN_VIEW_ALL          ?status=&memberUserId=&page=&size=
  * GET  /api/v1/loans/{id}               LOAN_VIEW_ALL
@@ -157,6 +160,19 @@ class LoanController {
     ApiResponse<LoanDetailView> addGuarantor(@PathVariable UUID loanId, @Valid @RequestBody AddGuarantorRequest request) {
         return ApiResponse.ok(loans.addGuarantor(chama(), CurrentUser.id(), loanId, request.guarantorUserId()),
                 "Guarantor asked");
+    }
+
+    @Operation(summary = "Transfer a guarantee to another member",
+            description = "Asks another active member to take over a guarantor's guarantee, e.g. a guarantor who is "
+                    + "leaving the chama. The borrower, the guarantor being replaced or an official with LOAN_APPROVE "
+                    + "may ask. The outgoing guarantor stays liable until the new one accepts (POST /{id}/guarantee); "
+                    + "then they are RELEASED.")
+    @PostMapping("/{loanId}/guarantors/{guarantorUserId}/replace")
+    @RequiresChamaMembership
+    ApiResponse<LoanDetailView> replaceGuarantor(@PathVariable UUID loanId, @PathVariable UUID guarantorUserId,
+                                                 @Valid @RequestBody ReplaceGuarantorRequest request) {
+        return ApiResponse.ok(loans.replaceGuarantor(chama(), CurrentUser.id(), loanId, guarantorUserId,
+                request.newGuarantorUserId()), "New guarantor asked to take over the guarantee");
     }
 
     @Operation(summary = "Cancel my application", description = "Borrower only, before the money is disbursed.")

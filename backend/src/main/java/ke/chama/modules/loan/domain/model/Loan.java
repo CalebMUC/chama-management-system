@@ -253,11 +253,63 @@ public final class Loan {
         return added;
     }
 
-    /** A guarantor accepts or declines. Once enough accept, the loan goes to the officials for approval. */
+    /**
+     * Asks {@code incomingUserId} to take over {@code outgoingUserId}'s guarantee, e.g. because the
+     * outgoing guarantor is leaving the chama. The outgoing guarantor stays liable until the new one
+     * accepts ({@link #respondAsGuarantor}); then they are RELEASED. The caller checks who may ask.
+     */
+    public Guarantor replaceGuarantor(UUID outgoingUserId, UUID incomingUserId, Instant now) {
+        if (!status.open()) {
+            throw new WrongLoanStatusException("replace a guarantor of", status);
+        }
+        Guarantor outgoing = guarantor(outgoingUserId)
+                .filter(g -> g.status() == Guarantor.Status.ACCEPTED)
+                .orElseThrow(() -> new InvalidLoanException("That member is not a guarantor of this loan"));
+        if (incomingUserId.equals(borrowerUserId)) {
+            throw new InvalidLoanException("A borrower cannot guarantee their own loan");
+        }
+        if (incomingUserId.equals(outgoingUserId)) {
+            throw new InvalidLoanException("Name a different member to take over the guarantee");
+        }
+        boolean alreadyAsked = guarantors.stream()
+                .anyMatch(g -> g.status() == Guarantor.Status.REQUESTED && outgoingUserId.equals(g.replacesUserId()));
+        if (alreadyAsked) {
+            throw new InvalidLoanException("Another member has already been asked to take over this guarantee;"
+                    + " wait for their answer");
+        }
+        Optional<Guarantor> existing = guarantor(incomingUserId);
+        if (existing.filter(g -> g.status() == Guarantor.Status.ACCEPTED || g.status() == Guarantor.Status.REQUESTED)
+                .isPresent()) {
+            throw new InvalidLoanException("That member is already a guarantor of this loan or has been asked to be");
+        }
+        Guarantor asked = new Guarantor(incomingUserId, Guarantor.Status.REQUESTED, now, null, outgoing.userId());
+        if (existing.isPresent()) {
+            replace(asked);
+        } else {
+            guarantors.add(asked);
+        }
+        return asked;
+    }
+
+    /**
+     * A guarantor accepts or declines. Once enough accept, the loan goes to the officials for
+     * approval. A member asked to take over another's guarantee releases that guarantor by accepting.
+     */
     public void respondAsGuarantor(UUID guarantorUserId, boolean accept, Instant now) {
         Guarantor current = guarantor(guarantorUserId).orElseThrow(NotAGuarantorException::new);
         if (current.status() != Guarantor.Status.REQUESTED) {
             throw new GuarantorAlreadyRespondedException();
+        }
+        if (current.replacesUserId() != null) {
+            if (!status.open()) {
+                throw new WrongLoanStatusException("respond to a guarantee request for", status);
+            }
+            replace(current.respond(accept ? Guarantor.Status.ACCEPTED : Guarantor.Status.DECLINED, now));
+            if (accept) {
+                guarantor(current.replacesUserId()).filter(g -> g.status() == Guarantor.Status.ACCEPTED)
+                        .ifPresent(g -> replace(g.respond(Guarantor.Status.RELEASED, now)));
+            }
+            return;
         }
         requireStatus("respond to a guarantee request for", Status.PENDING_GUARANTORS);
         replace(current.respond(accept ? Guarantor.Status.ACCEPTED : Guarantor.Status.DECLINED, now));
@@ -507,14 +559,23 @@ public final class Loan {
     public long version() { return version; }
 
     /** A member asked to guarantee the loan. */
-    public record Guarantor(UUID userId, Status status, Instant requestedAt, Instant respondedAt) {
+    /**
+     * @param replacesUserId on a request to take over another guarantor's guarantee: that guarantor
+     */
+    public record Guarantor(UUID userId, Status status, Instant requestedAt, Instant respondedAt, UUID replacesUserId) {
 
         public enum Status {
             REQUESTED,
             ACCEPTED,
             DECLINED,
             /** No longer needed: enough others accepted, or the loan was rejected or cancelled. */
-            WITHDRAWN
+            WITHDRAWN,
+            /** Was a guarantor until a replacement accepted the guarantee. */
+            RELEASED
+        }
+
+        public Guarantor(UUID userId, Status status, Instant requestedAt, Instant respondedAt) {
+            this(userId, status, requestedAt, respondedAt, null);
         }
 
         static Guarantor requested(UUID userId, Instant now) {
@@ -522,7 +583,7 @@ public final class Loan {
         }
 
         Guarantor respond(Status newStatus, Instant now) {
-            return new Guarantor(userId, newStatus, requestedAt, now);
+            return new Guarantor(userId, newStatus, requestedAt, now, replacesUserId);
         }
     }
 

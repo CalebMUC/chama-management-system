@@ -24,6 +24,14 @@ public interface LoanUseCases {
 
     LoanDetailView respondAsGuarantor(UUID chamaId, UUID guarantorUserId, UUID loanId, boolean accept);
 
+    /**
+     * Asks another active member to take over a guarantor's guarantee (e.g. a guarantor who is
+     * leaving the chama). The borrower, the outgoing guarantor or an official with LOAN_APPROVE may
+     * ask; the outgoing guarantor is released once the new one accepts.
+     */
+    LoanDetailView replaceGuarantor(UUID chamaId, UUID actorUserId, UUID loanId, UUID outgoingUserId,
+                                    UUID incomingUserId);
+
     LoanDetailView cancel(UUID chamaId, UUID actorUserId, UUID loanId);
 
     LoanDetailView approve(UUID chamaId, UUID actorUserId, UUID loanId, String note);
@@ -119,8 +127,9 @@ public interface LoanUseCases {
                     String rejectionReason) {
     }
 
+    /** @param replacesUserId on a request to take over another guarantor's guarantee: that guarantor */
     record GuarantorView(UUID userId, String name, Integer memberNumber, Loan.Guarantor.Status status,
-                         Instant requestedAt, Instant respondedAt) {
+                         Instant requestedAt, Instant respondedAt, UUID replacesUserId) {
     }
 
     record ApprovalView(UUID approverUserId, String name, String note, Instant approvedAt) {

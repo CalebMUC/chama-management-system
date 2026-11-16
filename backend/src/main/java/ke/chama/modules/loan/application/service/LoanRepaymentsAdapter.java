@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,10 +19,12 @@ import java.util.UUID;
 class LoanRepaymentsAdapter implements LoanRepayments {
 
     private final LoanUseCases loans;
+    private final LoanService service;
     private final LoanRepository repository;
 
-    LoanRepaymentsAdapter(LoanUseCases loans, LoanRepository repository) {
+    LoanRepaymentsAdapter(LoanUseCases loans, LoanService service, LoanRepository repository) {
         this.loans = loans;
+        this.service = service;
         this.repository = repository;
     }
 
@@ -36,6 +39,12 @@ class LoanRepaymentsAdapter implements LoanRepayments {
     public void recordRepayment(UUID chamaId, UUID officialUserId, UUID loanId, long amountMinor, String method,
                                 String reference, LocalDate paidOn) {
         loans.recordRepayment(chamaId, officialUserId, loanId, new Repayment(amountMinor, method, reference, paidOn));
+    }
+
+    @Override
+    public void repayFromSavings(UUID chamaId, UUID officialUserId, UUID loanId, List<SavingsSource> sources,
+                                 LocalDate paidOn) {
+        service.repayFromSavings(chamaId, officialUserId, loanId, sources, paidOn);
     }
 
     @Override

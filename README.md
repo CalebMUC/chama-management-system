@@ -78,7 +78,8 @@ Loan products (e.g. an emergency loan with its own terms) and savings products c
 | **Platform administration** | Onboard chamas with a unique login code, first administrator and licence (trial, basic, standard, premium); renew, upgrade or suspend licences |
 | **Licensing** | Plan, expiry, member limit and feature list per chama; expired or suspended licences block the chama; features gate whole modules |
 | **Auth** | Register, login, refresh-token rotation with reuse detection, logout / logout everywhere, login lockout, email verification, forgot / reset / change password |
-| **Members & roles** | Applications, approval, suspension, invitations; roles (member, treasurer, secretary, chairperson, auditor) mapped to 33 fine-grained permissions that each chama can re-map |
+| **Members & roles** | Applications, approval, suspension, invitations; roles (member, treasurer, secretary, chairperson, auditor, admin) mapped to 38 fine-grained permissions that each chama can re-map |
+| **Member exits** | A member leaves through a settlement approved by a quorum: refundable savings paid back less loans and penalties, non-refundable savings kept by the chama, no dividend that year; guarantees must first be transferred to another member |
 | **Contributions** | Automatic periods (monthly or weekly), payments by cash / bank / M-Pesa, allocation across savings products, arrears, advances, late periods, reversals |
 | **Savings products & member accounts** | Deposits, share capital, welfare and custom products; an account per member per product with statements |
 | **Penalties** | Nightly late-contribution penalties, fines, part-payments, waivers |
@@ -115,9 +116,9 @@ The backend is a **modular monolith** ([ADR-006](docs/architecture/ADR-006-modul
 │  ┌─────────┐ ┌─────────┐ ┌────────────┐ ┌────────┐ ┌────────────┐    │
 │  │ penalty │ │ expense │ │ investment │ │ report │ │ dataimport │    │
 │  └─────────┘ └─────────┘ └────────────┘ └────────┘ └────────────┘    │
-│  ┌──────────────────────┐ ┌───────┐ ┌──────────────┐                 │
-│  │ transaction (ledger) │ │ audit │ │ notification │                 │
-│  └──────────────────────┘ └───────┘ └──────────────┘                 │
+│  ┌──────────────────────┐ ┌───────┐ ┌──────────────┐ ┌────────────┐  │
+│  │ transaction (ledger) │ │ audit │ │ notification │ │ memberexit │  │
+│  └──────────────────────┘ └───────┘ └──────────────┘ └────────────┘  │
 │                                                                      │
 │  Domain events: Spring Modulith, persisted in an outbox table and    │
 │  delivered after commit (emails are sent asynchronously, retried)    │
@@ -140,7 +141,8 @@ Each module lives in `backend/src/main/java/ke/chama/modules/<module>` and is la
 | `contribution` | `contribution` | Contribution periods, payments, allocation, standings and arrears |
 | `account` | `account` | Savings products and member accounts |
 | `penalty` | `penalty` | Late-contribution penalties, fines, payments, waivers |
-| `loan` | `loan` | Loan products, applications, guarantors, approvals, schedules, repayments |
+| `loan` | `loan` | Loan products, applications, guarantors (and transferring a guarantee), approvals, schedules, repayments |
+| `memberexit` | `member_exit` | Members leaving: settlement of savings, loans and penalties, quorum approval, payout |
 | `expense` | `expense` | Expenses with maker-checker approval |
 | `investment` | `investment` | Investments, transactions, valuations, performance |
 | `transaction` | `ledger` | Double-entry ledger: chart of accounts, journal entries |
@@ -316,6 +318,7 @@ Paged lists add `meta` (`page`, `size`, `totalElements`, `totalPages`, `hasNext`
 | Auth & account | `/auth` (register, login, refresh, logout, logout-all, me, email verification, password forgot/reset/change) |
 | My chama | `/chama`, `/chama/settings`, `/chama/license` |
 | Members & roles | `/members`, `/roles` |
+| Member exits | `/member-exits` (preview, start, approve, reject, cancel, settle) |
 | Contributions | `/contributions` (payments, periods, standings, me) |
 | Savings | `/savings-products`, `/member-accounts` |
 | Penalties | `/penalties` |

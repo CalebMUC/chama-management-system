@@ -5,9 +5,11 @@ package ke.chama.modules.member.domain.model;
  * register ──► PENDING_APPROVAL ──approve──► ACTIVE ◄──reactivate── SUSPENDED
  *                     │                         └────────suspend────────┘
  *                     └─reject─► REJECTED
+ *
+ * ACTIVE or SUSPENDED ──exit settlement paid──► EXITED
  * </pre>
- * Only ACTIVE members hold permissions. EXITED is reserved for leaving the chama, which needs
- * final settlement of savings and loans (a later phase).
+ * Only ACTIVE members hold permissions. A member becomes EXITED when officials pay out their
+ * approved exit settlement (the memberexit module); it is final.
  */
 public enum MembershipStatus {
     PENDING_APPROVAL,

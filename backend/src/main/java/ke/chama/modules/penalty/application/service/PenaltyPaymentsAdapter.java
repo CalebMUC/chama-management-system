@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,10 +19,12 @@ import java.util.UUID;
 class PenaltyPaymentsAdapter implements PenaltyPayments {
 
     private final PenaltyUseCases penalties;
+    private final PenaltyService service;
     private final PenaltyRepository repository;
 
-    PenaltyPaymentsAdapter(PenaltyUseCases penalties, PenaltyRepository repository) {
+    PenaltyPaymentsAdapter(PenaltyUseCases penalties, PenaltyService service, PenaltyRepository repository) {
         this.penalties = penalties;
+        this.service = service;
         this.repository = repository;
     }
 
@@ -36,6 +39,12 @@ class PenaltyPaymentsAdapter implements PenaltyPayments {
     public void recordPayment(UUID chamaId, UUID officialUserId, UUID penaltyId, long amountMinor, String method,
                               String reference, LocalDate paidOn) {
         penalties.recordPayment(chamaId, officialUserId, penaltyId, new PaymentRequest(amountMinor, method, reference, paidOn));
+    }
+
+    @Override
+    public void payFromSavings(UUID chamaId, UUID officialUserId, UUID penaltyId, List<SavingsSource> sources,
+                               LocalDate paidOn) {
+        service.payFromSavings(chamaId, officialUserId, penaltyId, sources, paidOn);
     }
 
     @Override

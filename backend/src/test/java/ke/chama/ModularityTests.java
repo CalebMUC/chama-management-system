@@ -21,7 +21,7 @@ class ModularityTests {
                 .containsExactlyInAnyOrder(
                         "shared", "auth", "audit", "chama", "member", "contribution", "loan", "penalty",
                         "expense", "investment", "transaction", "notification", "report", "dataimport", "account",
-                        "submission");
+                        "submission", "memberexit");
     }
 
     @Test

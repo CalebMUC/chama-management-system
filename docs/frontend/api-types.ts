@@ -113,6 +113,12 @@ export type ChamaPermission =
   | 'MEMBER_SUSPEND'
   | 'MEMBER_ROLES_MANAGE'
   | 'ROLE_PERMISSIONS_MANAGE'
+  /** Start a member's exit (works out their settlement); cancel an exit you started. */
+  | 'MEMBER_EXIT_REQUEST'
+  /** Approve or reject an exit settlement (never one you started, never your own). */
+  | 'MEMBER_EXIT_APPROVE'
+  /** Pay out an approved exit settlement: closes the member's accounts and ends the membership. */
+  | 'MEMBER_EXIT_SETTLE'
   | 'CONTRIBUTION_VIEW_ALL'
   | 'CONTRIBUTION_RECORD'
   | 'CONTRIBUTION_REVERSE'
@@ -144,6 +150,7 @@ export type ChamaPermission =
 export const ALL_PERMISSIONS: readonly ChamaPermission[] = [
   'CHAMA_VIEW', 'CHAMA_SETTINGS_MANAGE', 'DATA_IMPORT',
   'MEMBER_VIEW', 'MEMBER_INVITE', 'MEMBER_APPROVE', 'MEMBER_SUSPEND', 'MEMBER_ROLES_MANAGE', 'ROLE_PERMISSIONS_MANAGE',
+  'MEMBER_EXIT_REQUEST', 'MEMBER_EXIT_APPROVE', 'MEMBER_EXIT_SETTLE',
   'CONTRIBUTION_VIEW_ALL', 'CONTRIBUTION_RECORD', 'CONTRIBUTION_REVERSE',
   'LOAN_APPLY', 'LOAN_VIEW_ALL', 'LOAN_APPROVE', 'LOAN_DISBURSE', 'LOAN_REPAYMENT_RECORD',
   'PENALTY_VIEW_ALL', 'PENALTY_RECORD', 'PENALTY_WAIVE',
@@ -155,7 +162,10 @@ export const ALL_PERMISSIONS: readonly ChamaPermission[] = [
   'PAYMENT_SUBMIT',
 ] as const;
 
-/** PENDING_APPROVAL -> ACTIVE <-> SUSPENDED; PENDING_APPROVAL -> REJECTED. EXITED is reserved (no endpoint yet). */
+/**
+ * PENDING_APPROVAL -> ACTIVE <-> SUSPENDED; PENDING_APPROVAL -> REJECTED; ACTIVE/SUSPENDED -> EXITED when
+ * the member's exit settlement is paid out (/member-exits). EXITED is final.
+ */
 export type MembershipStatus = 'PENDING_APPROVAL' | 'REJECTED' | 'ACTIVE' | 'SUSPENDED' | 'EXITED';
 
 export type ChamaStatus = 'ACTIVE' | 'ARCHIVED';
@@ -195,7 +205,8 @@ export type LoanStatus =
   | 'REPAID'
   | 'REJECTED'
   | 'CANCELLED';
-export type GuarantorStatus = 'REQUESTED' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN';
+/** RELEASED: was a guarantor until a member who took over the guarantee accepted it. */
+export type GuarantorStatus = 'REQUESTED' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN' | 'RELEASED';
 export type InstalmentStatus = 'PAID' | 'PARTLY_PAID' | 'DUE' | 'OVERDUE';
 
 export type ExpenseStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'PAID' | 'REJECTED' | 'CANCELLED';
@@ -484,6 +495,9 @@ export interface MemberView {
   appliedAt: ISOInstant;
   joinedAt: ISOInstant | null;
   suspensionReason: string | null;
+  /** Set once the member has left the chama (status EXITED). */
+  exitedAt: ISOInstant | null;
+  exitReason: string | null;
 }
 
 /** GET /members/me. `permissions` is empty unless the membership is ACTIVE. */
@@ -748,7 +762,8 @@ export interface PenaltyView {
 export interface PenaltyPaymentView {
   id: UUID;
   amountMinor: Minor;
-  method: PaymentMethod;
+  /** SAVINGS: cleared from the member's savings when they left the chama (no reference). */
+  method: PaymentMethod | 'SAVINGS';
   reference: string | null;
   paidOn: ISODate;
   ledgerEntryId: UUID | null;
@@ -875,6 +890,13 @@ export interface GuarantorView {
   status: GuarantorStatus;
   requestedAt: ISOInstant;
   respondedAt: ISOInstant | null;
+  /** On a request to take over another guarantor's guarantee: the guarantor being replaced. */
+  replacesUserId: UUID | null;
+}
+
+/** POST /loans/{loanId}/guarantors/{guarantorUserId}/replace */
+export interface ReplaceGuarantorRequest {
+  newGuarantorUserId: UUID;
 }
 
 export interface LoanApprovalView {
@@ -895,7 +917,8 @@ export interface InstalmentView {
 export interface LoanRepaymentView {
   id: UUID;
   amountMinor: Minor;
-  method: PaymentMethod;
+  /** SAVINGS: cleared from the borrower's savings when they left the chama (no reference). */
+  method: PaymentMethod | 'SAVINGS';
   reference: string | null;
   paidOn: ISODate;
   ledgerEntryId: UUID | null;
@@ -1138,6 +1161,110 @@ export interface ExpenseListParams extends PageParams {
   /** Filters on incurredOn. */
   from?: ISODate;
   to?: ISODate;
+}
+
+// =====================================================================================================
+// Member exits  (/api/v1/member-exits)
+// =====================================================================================================
+
+/** PENDING_APPROVAL -> (quorum) APPROVED -> (paid out) SETTLED; or REJECTED / CANCELLED before payout. */
+export type ExitStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'SETTLED' | 'REJECTED' | 'CANCELLED';
+
+/**
+ * REFUND: refundable savings paid back. FORFEIT: non-refundable savings kept by the chama.
+ * LOAN / PENALTY: owed, cleared from the refundable savings.
+ */
+export type ExitLineKind = 'REFUND' | 'FORFEIT' | 'LOAN' | 'PENALTY';
+
+export interface StartExitRequest {
+  memberUserId: UUID;
+  reason: string; // max 300
+}
+
+export interface ExitApproveRequest {
+  note?: string;
+}
+export interface ExitRejectRequest {
+  reason: string;
+}
+/** Needed only when payoutMinor > 0. */
+export interface ExitSettleRequest {
+  method?: PaymentMethod;
+  /** Required for MPESA and BANK. */
+  reference?: string;
+  /** Default today; not in the future or before the exit was started. */
+  settledOn?: ISODate;
+}
+
+export interface ExitLineView {
+  kind: ExitLineKind;
+  /** The savings product, loan or penalty. */
+  sourceId: UUID;
+  description: string;
+  amountMinor: Minor;
+}
+
+/** payoutMinor = refundableMinor - loansMinor - penaltiesMinor. */
+export interface ExitSettlementView {
+  currency: string;
+  refundableMinor: Minor;
+  forfeitedMinor: Minor;
+  loansMinor: Minor;
+  penaltiesMinor: Minor;
+  payoutMinor: Minor;
+  /** Owed beyond the refundable savings; blocks the exit until paid. */
+  shortfallMinor: Minor;
+  /** Always 0: no dividend is paid for the year a member leaves. */
+  dividendMinor: Minor;
+  lines: ExitLineView[];
+}
+
+/** GET /member-exits/preview?memberUserId= */
+export interface ExitPreviewView {
+  memberUserId: UUID;
+  memberName: string | null;
+  memberNumber: number | null;
+  settlement: ExitSettlementView;
+  /** Why the member cannot leave yet (guarantees to transfer, loan applications, shortfall, ...). */
+  blockers: string[];
+  canExit: boolean;
+}
+
+export interface ExitApprovalView {
+  approverUserId: UUID;
+  name: string | null;
+  note: string | null;
+  approvedAt: ISOInstant;
+}
+
+export interface ExitView {
+  id: UUID;
+  memberUserId: UUID;
+  memberName: string | null;
+  memberNumber: number | null;
+  reason: string;
+  status: ExitStatus;
+  /** As approved; checked again, unchanged, at payout. */
+  settlement: ExitSettlementView;
+  requestedBy: UUID;
+  requestedByName: string | null;
+  requestedAt: ISOInstant;
+  requiredApprovals: number;
+  approvals: ExitApprovalView[];
+  rejectedBy: UUID | null;
+  rejectedAt: ISOInstant | null;
+  rejectionReason: string | null;
+  cancelledAt: ISOInstant | null;
+  settledOn: ISODate | null;
+  settledBy: UUID | null;
+  paymentMethod: PaymentMethod | null;
+  paymentReference: string | null;
+  settlementEntryId: UUID | null;
+}
+
+export interface ExitListParams extends PageParams {
+  status?: ExitStatus;
+  memberUserId?: UUID;
 }
 
 // =====================================================================================================

@@ -111,18 +111,22 @@ class JdbcLoanRepository implements LoanRepository {
     private void saveChildren(Loan l) {
         for (Loan.Guarantor g : l.guarantors()) {
             jdbc.update("""
-                    insert into loan.guarantors (tenant_id, loan_id, guarantor_user_id, status, requested_at, responded_at)
-                    values (:tenant, :loan, :user, :status, :requestedAt, :respondedAt)
+                    insert into loan.guarantors (tenant_id, loan_id, guarantor_user_id, status, requested_at, responded_at,
+                                                 replaces_user_id)
+                    values (:tenant, :loan, :user, :status, :requestedAt, :respondedAt, :replaces)
                     on conflict (tenant_id, loan_id, guarantor_user_id)
-                    do update set status = excluded.status, responded_at = excluded.responded_at
-                     where loan.guarantors.status is distinct from excluded.status""",
+                    do update set status = excluded.status, responded_at = excluded.responded_at,
+                                  requested_at = excluded.requested_at, replaces_user_id = excluded.replaces_user_id
+                     where (loan.guarantors.status, loan.guarantors.replaces_user_id)
+                           is distinct from (excluded.status, excluded.replaces_user_id)""",
                     new MapSqlParameterSource()
                             .addValue("tenant", l.chamaId())
                             .addValue("loan", l.id())
                             .addValue("user", g.userId())
                             .addValue("status", g.status().name())
                             .addValue("requestedAt", Timestamp.from(g.requestedAt()))
-                            .addValue("respondedAt", timestamp(g.respondedAt())));
+                            .addValue("respondedAt", timestamp(g.respondedAt()))
+                            .addValue("replaces", g.replacesUserId()));
         }
         for (Loan.Approval a : l.approvals()) {
             jdbc.update("""
@@ -337,12 +341,14 @@ class JdbcLoanRepository implements LoanRepository {
         MapSqlParameterSource params = new MapSqlParameterSource("tenant", chamaId).addValue("ids", ids);
         Map<UUID, List<Loan.Guarantor>> guarantors = new HashMap<>();
         jdbc.query("""
-                select loan_id, guarantor_user_id, status, requested_at, responded_at from loan.guarantors
+                select loan_id, guarantor_user_id, status, requested_at, responded_at, replaces_user_id
+                  from loan.guarantors
                  where tenant_id = :tenant and loan_id in (:ids) order by requested_at, guarantor_user_id""", params, rs -> {
             guarantors.computeIfAbsent(rs.getObject("loan_id", UUID.class), k -> new ArrayList<>())
                     .add(new Loan.Guarantor(rs.getObject("guarantor_user_id", UUID.class),
                             Loan.Guarantor.Status.valueOf(rs.getString("status")),
-                            rs.getTimestamp("requested_at").toInstant(), instant(rs, "responded_at")));
+                            rs.getTimestamp("requested_at").toInstant(), instant(rs, "responded_at"),
+                            rs.getObject("replaces_user_id", UUID.class)));
         });
         Map<UUID, List<Loan.Approval>> approvals = new HashMap<>();
         jdbc.query("""

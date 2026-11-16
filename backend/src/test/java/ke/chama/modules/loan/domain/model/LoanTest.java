@@ -206,6 +206,68 @@ class LoanTest {
         }
     }
 
+    @Nested
+    class TransferringAGuarantee {
+
+        @Test
+        void theOutgoingGuarantorIsReleasedOnceTheReplacementAccepts() {
+            Loan loan = guaranteedAndDisbursed();
+
+            loan.replaceGuarantor(ALICE, CAROL, NOW);
+            assertThat(loan.guarantor(CAROL).orElseThrow().status()).isEqualTo(Loan.Guarantor.Status.REQUESTED);
+            assertThat(loan.guarantor(CAROL).orElseThrow().replacesUserId()).isEqualTo(ALICE);
+            assertThat(loan.guarantor(ALICE).orElseThrow().status())
+                    .as("still liable until the replacement accepts").isEqualTo(Loan.Guarantor.Status.ACCEPTED);
+
+            loan.respondAsGuarantor(CAROL, true, NOW);
+
+            assertThat(loan.guarantor(CAROL).orElseThrow().status()).isEqualTo(Loan.Guarantor.Status.ACCEPTED);
+            assertThat(loan.guarantor(ALICE).orElseThrow().status()).isEqualTo(Loan.Guarantor.Status.RELEASED);
+            assertThat(loan.acceptedGuarantors()).isEqualTo(2);
+            assertThat(loan.status()).isEqualTo(Loan.Status.ACTIVE);
+        }
+
+        @Test
+        void aDeclinedReplacementLeavesTheGuaranteeWhereItWasAndAnotherMemberCanBeAsked() {
+            Loan loan = guaranteedAndDisbursed();
+            loan.replaceGuarantor(ALICE, CAROL, NOW);
+
+            assertThatThrownBy(() -> loan.replaceGuarantor(ALICE, CHAIR, NOW))
+                    .as("one replacement request at a time").hasMessageContaining("wait for their answer");
+            loan.respondAsGuarantor(CAROL, false, NOW);
+
+            assertThat(loan.guarantor(ALICE).orElseThrow().status()).isEqualTo(Loan.Guarantor.Status.ACCEPTED);
+            loan.replaceGuarantor(ALICE, CAROL, NOW);
+            assertThat(loan.guarantor(CAROL).orElseThrow().status())
+                    .as("a member who declined can be asked again").isEqualTo(Loan.Guarantor.Status.REQUESTED);
+        }
+
+        @Test
+        void onlyAnAcceptedGuaranteeOnAnOpenLoanCanBeTransferredToSomeoneNew() {
+            Loan loan = guaranteedAndDisbursed();
+
+            assertThatThrownBy(() -> loan.replaceGuarantor(CAROL, CHAIR, NOW)).hasMessageContaining("not a guarantor");
+            assertThatThrownBy(() -> loan.replaceGuarantor(ALICE, BORROWER, NOW)).hasMessageContaining("own loan");
+            assertThatThrownBy(() -> loan.replaceGuarantor(ALICE, BOB, NOW)).hasMessageContaining("already a guarantor");
+            assertThatThrownBy(() -> loan.replaceGuarantor(ALICE, ALICE, NOW)).hasMessageContaining("different member");
+
+            loan.repay(TREASURER, loan.outstandingMinor());
+            assertThatThrownBy(() -> loan.replaceGuarantor(ALICE, CAROL, NOW)).extracting("code")
+                    .isEqualTo("LOAN_WRONG_STATUS");
+        }
+
+        private Loan guaranteedAndDisbursed() {
+            Loan loan = apply(1_000_000, 6, "Plot", 2, List.of(ALICE, BOB));
+            loan.respondAsGuarantor(ALICE, true, NOW);
+            loan.respondAsGuarantor(BOB, true, NOW);
+            loan.approve(CHAIR, null, NOW);
+            loan.approve(TREASURER, null, NOW);
+            loan.disburse(TREASURER, "CASH", null, TODAY, TODAY);
+            loan.disbursementPostedAs(UUID.randomUUID());
+            return loan;
+        }
+    }
+
     private static Loan apply(long principal, int term, String purpose, int guarantors, List<UUID> named) {
         return Loan.apply(CHAMA, BORROWER, PRODUCT, principal, term, purpose, "KES", 1_000, guarantors, 2, named, TODAY, NOW);
     }

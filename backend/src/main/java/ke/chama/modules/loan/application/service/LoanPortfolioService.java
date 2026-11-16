@@ -46,9 +46,24 @@ class LoanPortfolioService implements LoanPortfolio {
     @Override
     public int pendingGuaranteeRequests(UUID chamaId, UUID memberUserId) {
         return (int) repository.guaranteedBy(chamaId, memberUserId).stream()
-                .filter(l -> l.status() == Loan.Status.PENDING_GUARANTORS)
+                .filter(l -> l.status().open())
                 .filter(l -> l.guarantor(memberUserId).map(g -> g.status() == Loan.Guarantor.Status.REQUESTED).orElse(false))
                 .count();
+    }
+
+    @Override
+    public List<HeldGuarantee> guaranteesHeldBy(UUID chamaId, UUID memberUserId) {
+        return repository.guaranteedBy(chamaId, memberUserId).stream()
+                .filter(l -> l.status().open())
+                .flatMap(l -> l.guarantor(memberUserId)
+                        .filter(g -> g.status() == Loan.Guarantor.Status.ACCEPTED
+                                || g.status() == Loan.Guarantor.Status.REQUESTED)
+                        .map(g -> new HeldGuarantee(l.id(), l.borrowerUserId(), l.purpose(), l.status().name(),
+                                g.status().name(), l.outstandingMinor(), l.currency(),
+                                l.guarantors().stream().anyMatch(o -> o.status() == Loan.Guarantor.Status.REQUESTED
+                                        && memberUserId.equals(o.replacesUserId()))))
+                        .stream())
+                .toList();
     }
 
     private List<LoanSnapshot> snapshots(UUID chamaId, List<Loan> loans) {

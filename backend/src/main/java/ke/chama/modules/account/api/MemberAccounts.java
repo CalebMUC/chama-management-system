@@ -35,4 +35,11 @@ public interface MemberAccounts {
      * @return the opened date before the change
      */
     LocalDate correctOpenedOn(UUID chamaId, UUID accountId, LocalDate openedOn, UUID actorUserId);
+
+    /**
+     * Closes every open account of a member who is leaving the chama, as of {@code closedOn}: no
+     * dues are owed for periods due from that day. Every balance must already be zero. Runs in
+     * the caller's transaction; audit-logged as MEMBER_ACCOUNT_CLOSED.
+     */
+    void closeAllForExit(UUID chamaId, UUID memberUserId, LocalDate closedOn, String reason, UUID actorUserId);
 }

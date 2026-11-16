@@ -34,7 +34,9 @@ public final class MemberViews {
                              Set<ChamaRole> roles,
                              Instant appliedAt,
                              Instant joinedAt,
-                             String suspensionReason) {
+                             String suspensionReason,
+                             Instant exitedAt,
+                             String exitReason) {
 
         public static MemberView of(Membership m, UserSummary user) {
             return new MemberView(m.getId(), m.getChamaId(), m.getMemberNumber(), m.getUserId(),
@@ -43,7 +45,8 @@ public final class MemberViews {
                     user != null ? user.lastName() : null,
                     user != null ? user.phoneNumber() : null,
                     user != null && user.emailVerified(),
-                    m.getStatus(), Set.copyOf(m.getRoles()), m.getAppliedAt(), m.getJoinedAt(), m.getSuspensionReason());
+                    m.getStatus(), Set.copyOf(m.getRoles()), m.getAppliedAt(), m.getJoinedAt(), m.getSuspensionReason(),
+                    m.getExitedAt(), m.getExitReason());
         }
     }
 

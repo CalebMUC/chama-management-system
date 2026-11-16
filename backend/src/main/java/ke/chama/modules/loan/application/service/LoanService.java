@@ -18,13 +18,17 @@ import ke.chama.modules.loan.domain.model.LoanEligibility;
 import ke.chama.modules.loan.domain.model.LoanProduct;
 import ke.chama.modules.account.api.MemberAccounts;
 import ke.chama.modules.loan.domain.model.LoanRepayment;
+import ke.chama.modules.loan.domain.exception.LoanExceptions.InvalidLoanException;
+import ke.chama.modules.loan.domain.exception.LoanExceptions.GuaranteeTransferNotAllowedException;
 import ke.chama.modules.member.api.MemberDirectory;
+import ke.chama.modules.member.api.MemberPermissions;
 import ke.chama.modules.member.api.MemberSummary;
 import ke.chama.modules.transaction.api.Ledger;
 import ke.chama.modules.transaction.api.LedgerAccountKey;
 import ke.chama.modules.transaction.api.PostingRequest;
 import ke.chama.modules.transaction.api.PostingRequest.PostingLine;
 import ke.chama.shared.domain.Money;
+import ke.chama.shared.security.ChamaPermission;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -65,6 +69,7 @@ public class LoanService implements LoanUseCases {
     private final LoanRepository repository;
     private final LoanProductService products;
     private final MemberDirectory members;
+    private final MemberPermissions permissions;
     private final MemberAccounts memberAccounts;
     private final ChamaDirectory chamas;
     private final Ledger ledger;
@@ -74,12 +79,13 @@ public class LoanService implements LoanUseCases {
     private final ZoneId zone;
 
     public LoanService(LoanRepository repository, LoanProductService products, MemberDirectory members,
-                       MemberAccounts memberAccounts, ChamaDirectory chamas, Ledger ledger,
+                       MemberPermissions permissions, MemberAccounts memberAccounts, ChamaDirectory chamas, Ledger ledger,
                        AuditTrail auditTrail, ApplicationEventPublisher events, Clock clock,
                        @Value("${chama.time-zone:Africa/Nairobi}") String timeZone) {
         this.repository = repository;
         this.products = products;
         this.members = members;
+        this.permissions = permissions;
         this.memberAccounts = memberAccounts;
         this.chamas = chamas;
         this.ledger = ledger;
@@ -143,10 +149,33 @@ public class LoanService implements LoanUseCases {
     @Override
     public LoanDetailView respondAsGuarantor(UUID chamaId, UUID guarantorUserId, UUID loanId, boolean accept) {
         Loan loan = load(chamaId, loanId);
+        UUID replaces = loan.guarantor(guarantorUserId).map(Loan.Guarantor::replacesUserId).orElse(null);
         loan.respondAsGuarantor(guarantorUserId, accept, clock.instant());
         save(loan);
         audit(loan, guarantorUserId, accept ? "LOAN_GUARANTEE_ACCEPTED" : "LOAN_GUARANTEE_DECLINED",
                 Map.of("acceptedGuarantors", loan.acceptedGuarantors(), "requiredGuarantors", loan.requiredGuarantors()));
+        if (accept && replaces != null) {
+            audit(loan, guarantorUserId, "LOAN_GUARANTEE_TRANSFERRED", Map.of("fromUserId", replaces.toString(),
+                    "toUserId", guarantorUserId.toString()));
+        }
+        return detail(loan);
+    }
+
+    @Override
+    public LoanDetailView replaceGuarantor(UUID chamaId, UUID actorUserId, UUID loanId, UUID outgoingUserId,
+                                           UUID incomingUserId) {
+        Loan loan = load(chamaId, loanId);
+        boolean mayAsk = actorUserId.equals(loan.borrowerUserId()) || actorUserId.equals(outgoingUserId)
+                || permissions.permissionsOf(chamaId, actorUserId).contains(ChamaPermission.LOAN_APPROVE);
+        if (!mayAsk) {
+            throw new GuaranteeTransferNotAllowedException();
+        }
+        MemberSummary incoming = activeMember(chamaId, incomingUserId, "The member taking over the guarantee");
+        loan.replaceGuarantor(outgoingUserId, incomingUserId, clock.instant());
+        save(loan);
+        audit(loan, actorUserId, "LOAN_GUARANTOR_REPLACEMENT_REQUESTED", Map.of("outgoingUserId",
+                outgoingUserId.toString(), "incomingUserId", incomingUserId.toString()));
+        askToGuarantee(loan, incoming);
         return detail(loan);
     }
 
@@ -244,6 +273,40 @@ public class LoanService implements LoanUseCases {
             tellBorrower(loan);
         }
         return detail(loan);
+    }
+
+    /**
+     * Clears what a member who is leaving owes on a loan from their own savings: debits each savings
+     * account named in {@code sources} (the member's balance there) and credits their "Loans
+     * receivable". Recorded as a repayment with method SAVINGS. Runs in the caller's transaction.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void repayFromSavings(UUID chamaId, UUID actorUserId, UUID loanId,
+                                 List<ke.chama.modules.loan.api.LoanRepayments.SavingsSource> sources, LocalDate paidOn) {
+        Loan loan = load(chamaId, loanId);
+        long total = sources.stream().mapToLong(ke.chama.modules.loan.api.LoanRepayments.SavingsSource::amountMinor).sum();
+        if (sources.isEmpty() || sources.stream().anyMatch(s -> s.amountMinor() <= 0)) {
+            throw new InvalidLoanException("Each amount taken from savings must be greater than zero");
+        }
+        LoanRepayment repayment = LoanRepayment.fromSavings(loan, total, paidOn, actorUserId, today(), clock.instant());
+        loan.repay(actorUserId, total);
+        List<PostingLine> lines = new ArrayList<>();
+        for (var source : sources) {
+            lines.add(new PostingLine(null, source.accountCode(), ke.chama.modules.transaction.api.EntrySide.DEBIT,
+                    money(source.amountMinor(), loan.currency()), loan.borrowerUserId(), null));
+        }
+        lines.add(PostingLine.credit(LedgerAccountKey.LOANS_RECEIVABLE, money(total, loan.currency()))
+                .forMember(loan.borrowerUserId()));
+        UUID entryId = ledger.post(new PostingRequest(chamaId, repayment.paidOn(),
+                "Loan cleared from savings on leaving the chama: " + loan.purpose(), null, SOURCE_REPAYMENT,
+                repayment.id().toString(), actorUserId, lines));
+        repository.insertRepayment(repayment.postedAs(entryId));
+        save(loan);
+        audit(loan, actorUserId, "LOAN_REPAYMENT_RECORDED", Map.of("amountMinor", total, "method", repayment.method(),
+                "outstandingMinor", loan.outstandingMinor()));
+        if (loan.status() == Loan.Status.REPAID) {
+            audit(loan, actorUserId, "LOAN_REPAID", Map.of("totalRepaidMinor", loan.repaidMinor()));
+        }
     }
 
     // ---- queries --------------------------------------------------------------------------------
@@ -418,7 +481,7 @@ public class LoanService implements LoanUseCases {
         List<GuarantorView> guarantors = loan.guarantors().stream().map(g -> {
             MemberSummary m = seated.get(g.userId());
             return new GuarantorView(g.userId(), name(m), m == null ? null : m.memberNumber(), g.status(),
-                    g.requestedAt(), g.respondedAt());
+                    g.requestedAt(), g.respondedAt(), g.replacesUserId());
         }).toList();
         List<ApprovalView> approvals = loan.approvals().stream()
                 .map(a -> new ApprovalView(a.approverUserId(), name(seated.get(a.approverUserId())), a.note(), a.approvedAt()))

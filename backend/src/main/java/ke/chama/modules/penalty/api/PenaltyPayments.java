@@ -1,6 +1,7 @@
 package ke.chama.modules.penalty.api;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,8 +19,20 @@ public interface PenaltyPayments {
     void recordPayment(UUID chamaId, UUID officialUserId, UUID penaltyId, long amountMinor, String method,
                        String reference, LocalDate paidOn);
 
+    /**
+     * Clears (part of) a penalty owed by a member who is leaving the chama from their own savings:
+     * each source names a savings product's member-ledger account and how much to take from the
+     * member's balance there. Recorded as a payment with method SAVINGS. Runs in the caller's
+     * transaction, which must exist.
+     */
+    void payFromSavings(UUID chamaId, UUID officialUserId, UUID penaltyId, List<SavingsSource> sources, LocalDate paidOn);
+
     /** A penalty payment already carries this reference. */
     boolean referenceUsed(UUID chamaId, String method, String reference);
+
+    /** How much to take from the member's balance on one savings account (by ledger account code). */
+    record SavingsSource(String accountCode, long amountMinor) {
+    }
 
     /**
      * @param status OUTSTANDING, PAID or WAIVED

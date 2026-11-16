@@ -235,6 +235,7 @@ Branch on `error.code`, never on `message`.
 | `LOAN_SELF_HANDLING`            | 403    | An official approving, rejecting, disbursing or recording repayments on their own loan |
 | `LOAN_GUARANTOR_CANNOT_APPROVE` | 403    | An official approving a loan they guarantee                    |
 | `LOAN_NOT_BORROWER`             | 403    | Someone other than the borrower cancelling or adding guarantors |
+| `LOAN_GUARANTEE_TRANSFER_NOT_ALLOWED` | 403 | Someone other than the borrower, the guarantor or an official with LOAN_APPROVE transferring a guarantee |
 | `LOAN_NOT_GUARANTOR`            | 403    | Answering a guarantee request you were not sent                |
 | `LOAN_NOT_FOUND`                | 404    | No such loan in this chama                                     |
 | `LOAN_MEMBER_NOT_FOUND`         | 404    | A guarantor is not an active member                            |
@@ -259,6 +260,23 @@ Branch on `error.code`, never on `message`.
 | `EXPENSE_ALREADY_APPROVED`    | 409    | The same official approving twice                               |
 | `EXPENSE_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been used for an expense |
 | `EXPENSE_INSUFFICIENT_FUNDS`  | 422    | The account the expense is paid from does not hold enough       |
+
+**Member exits**
+
+| Code                       | Status | When                                                          |
+|----------------------------|--------|---------------------------------------------------------------|
+| `EXIT_INVALID`             | 400    | No reason, a future or too-early settlement date, or a payout without its method or M-Pesa/bank reference |
+| `EXIT_SELF_HANDLING`       | 403    | Starting, approving, rejecting or paying out your own exit, or approving/rejecting an exit you started |
+| `EXIT_NOT_REQUESTER`       | 403    | Someone other than whoever started the exit cancelling it      |
+| `EXIT_NOT_A_MEMBER`        | 404    | The person is not an active or suspended member                |
+| `EXIT_NOT_FOUND`           | 404    | No such exit in this chama                                     |
+| `EXIT_WRONG_STATUS`        | 409    | The step does not fit the status, e.g. paying out before approval |
+| `EXIT_ALREADY_APPROVED`    | 409    | The same official approving twice                              |
+| `EXIT_IN_PROGRESS`         | 409    | The member already has an exit awaiting approval or payout     |
+| `EXIT_SETTLEMENT_CHANGED`  | 409    | The member's savings, loans or penalties changed after approval: reject or cancel, then start again |
+| `EXIT_DUPLICATE_REFERENCE` | 409    | That M-Pesa code or bank slip has already been used for an exit payout |
+| `EXIT_BLOCKED`             | 422    | The member guarantees a loan (transfer it first), has a loan application in progress, owes more than their refundable savings, or is the only chairperson. The message lists every reason |
+| `EXIT_INSUFFICIENT_FUNDS`  | 422    | The account the payout leaves from does not hold enough        |
 
 **Investments** (need the `INVESTMENTS` licence feature)
 

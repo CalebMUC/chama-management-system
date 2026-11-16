@@ -52,6 +52,12 @@ class MemberDirectoryService implements MemberDirectory {
     }
 
     @Override
+    public Optional<MemberSummary> anyMember(UUID chamaId, UUID userId) {
+        return memberships.findByChamaIdAndUserId(chamaId, userId)
+                .map(m -> summary(m, users.findById(userId).orElse(null)));
+    }
+
+    @Override
     public MembershipCounts counts(UUID chamaId) {
         return new MembershipCounts(memberships.countByChamaIdAndStatus(chamaId, MembershipStatus.ACTIVE),
                 memberships.countByChamaIdAndStatus(chamaId, MembershipStatus.SUSPENDED),

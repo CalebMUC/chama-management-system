@@ -52,6 +52,7 @@ What the platform manages, and the module that does it:
 | Area | What happens | Who acts |
 |---|---|---|
 | **Membership** | People register with the chama code, an official approves them, they get a member number. Officials suspend/reactivate members and assign roles. | Applicant, secretary, chairperson |
+| **Member exits** | A member leaves through a settlement: refundable savings paid back less loans and penalties, non-refundable savings kept by the chama, no dividend that year. A quorum approves it; the treasurer pays it out. A guarantor must transfer their guarantees first. | Treasurer starts and pays; chair/secretary approve |
 | **Contributions** | Each period (e.g. month `2026-11`) every member owes the contribution. Officials record payments (cash, bank, M-Pesa with its transaction code). The system computes arrears, advances and late periods. | Treasurer records; member views own |
 | **Savings products** | Pots members save into: Deposits (default), Share capital, Welfare, custom. A payment is split across products by priority. Each member has an account per product with a statement. | Treasurer configures |
 | **Penalties** | Late contributions are penalised automatically (a % of the contribution). Officials also fine members, record penalty payments and waive penalties. | Treasurer, chairperson |
@@ -101,7 +102,7 @@ Two principles show up everywhere and must be visible in the UI:
 | **Platform administrator** | `/admin/login`, email + password, **no chama code**. `GET /auth/me` returns `roles` containing `ROLE_ADMIN` and `chamaId: null`. | Platform console only (chamas, licences). Chama endpoints return `TENANT_REQUIRED`. |
 | **Applicant** | Registered with a chama code; membership `PENDING_APPROVAL`. | A waiting screen. No permissions. |
 | **Member** | Chama code + email + password; membership `ACTIVE`. | Their own dashboard, savings, contributions, loans, penalties, statement. Plus whatever their roles' permissions allow. |
-| **Suspended / rejected / exited member** | Can still log in. `permissions` is empty. | A status screen explaining their state (show `suspensionReason`). |
+| **Suspended / rejected / exited member** | Can still log in. `permissions` is empty. | A status screen explaining their state (show `suspensionReason`, or `exitReason` and `exitedAt`). |
 
 ### 2.2 Tenancy and the chama code
 
@@ -137,6 +138,9 @@ Default mapping for a new chama (✓ = granted):
 | `MEMBER_VIEW` | | ✓ | ✓ | ✓ | ✓ | ✓ | Member directory, roles list |
 | `MEMBER_INVITE` | | | ✓ | ✓ | | ✓ | Add members directly, invite by email, keep KYC details |
 | `MEMBER_APPROVE` | | | | ✓ | | ✓ | Approve/reject applications |
+| `MEMBER_EXIT_REQUEST` | | ✓ | | ✓ | | ✓ | Preview and start a member's exit; cancel one you started |
+| `MEMBER_EXIT_APPROVE` | | | ✓ | ✓ | | | Approve/reject exit settlements |
+| `MEMBER_EXIT_SETTLE` | | ✓ | | ✓ | | | Pay out an approved exit (ends the membership) |
 | `MEMBER_SUSPEND` | | | | ✓ | | ✓ | Suspend/reactivate |
 | `MEMBER_ROLES_MANAGE` | | | | ✓ | | ✓ | Change a member's roles |
 | `ROLE_PERMISSIONS_MANAGE` | | | | ✓ | | | Edit role → permission mapping |
@@ -580,6 +584,7 @@ Navigation groups. Show an item only if its permission and feature checks pass. 
 | | My reported payments | `/me/payments` | active member | — |
 | **Chama** | Overview (dashboard) | `/chama` | `CHAMA_VIEW` (`REPORT_VIEW_ALL` gets the full officials' version) | — |
 | | Members | `/members`, `/members/:userId` | `MEMBER_VIEW` | — |
+| | Member exits | `/members/exits`, `/members/exits/:id` | `MEMBER_VIEW`; start: `MEMBER_EXIT_REQUEST` | — |
 | | Expenses | `/expenses`, `/expenses/:id` | `EXPENSE_VIEW` | EXPENSES |
 | | Investments | `/investments`, `/investments/portfolio`, `/investments/:id` | `INVESTMENT_VIEW` | INVESTMENTS |
 | **Money** | Contributions | `/contributions` (payments), `/contributions/periods`, `/contributions/periods/:id`, `/contributions/standings` | `CONTRIBUTION_VIEW_ALL` | CONTRIBUTIONS |
@@ -1048,6 +1053,7 @@ The server enforces these; the UI should hide or disable the action with a toolt
 | A loan's guarantor cannot approve it | `LOAN_GUARANTOR_CANNOT_APPROVE` |
 | Each official approves a loan/expense/investment once | `*_ALREADY_APPROVED` |
 | Whoever recorded an expense / proposed an investment cannot approve or reject it | `EXPENSE_SELF_APPROVAL`, `INVESTMENT_SELF_APPROVAL` |
+| Whoever started a member's exit cannot approve or reject it; nobody handles their own exit | `EXIT_SELF_HANDLING` |
 | Only the recorder cancels an expense; only the proposer cancels an investment; only the borrower cancels a loan or adds guarantors | `EXPENSE_NOT_REQUESTER`, `INVESTMENT_NOT_PROPOSER`, `LOAN_NOT_BORROWER` |
 
 Show quorum progress on every approvable record: "Approvals: 1 of 2" with approver names.

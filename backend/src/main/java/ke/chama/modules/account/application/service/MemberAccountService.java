@@ -171,6 +171,26 @@ public class MemberAccountService implements MemberAccounts, MemberAccountUseCas
                 .sum();
     }
 
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void closeAllForExit(UUID chamaId, UUID memberUserId, LocalDate closedOn, String reason, UUID actorUserId) {
+        for (MemberAccount account : repository.accountsOf(chamaId, memberUserId)) {
+            if (!account.active()) {
+                continue;
+            }
+            SavingsProduct product = product(chamaId, account.productId());
+            Money balance = ledger.memberBalance(chamaId, memberUserId, product.ledgerAccountCode());
+            if (!balance.isZero()) {
+                throw new AccountStateException("Account " + account.accountNumber() + " still holds " + balance
+                        + "; it can only be closed with a zero balance");
+            }
+            MemberAccount closed = account.close(actorUserId, reason, closedOn);
+            save(closed);
+            audit(closed, actorUserId, "MEMBER_ACCOUNT_CLOSED", Map.of("productCode", product.code(),
+                    "reason", closed.closureReason(), "exit", true));
+        }
+    }
+
     // ---- use cases ------------------------------------------------------------------------------
 
     @Override

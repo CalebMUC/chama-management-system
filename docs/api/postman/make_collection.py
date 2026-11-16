@@ -181,6 +181,32 @@ items = [
                              "LEDGER_VIEW", "REPORT_VIEW_ALL", "AUDIT_LOG_VIEW"]}),
     ]),
 
+    folder("Member exits", [
+        req("Preview a member's exit", "GET", "/api/v1/member-exits/preview",
+            query=[q("memberUserId", "{{memberUserId}}", disabled=False)],
+            desc="Treasurer (MEMBER_EXIT_REQUEST). Refundable savings paid back less loans and penalties; "
+                 "non-refundable savings kept by the chama; no dividend for the year. Lists what blocks the exit, "
+                 "e.g. guarantees to transfer first."),
+        req("Start an exit", "POST", "/api/v1/member-exits",
+            {"memberUserId": "{{memberUserId}}", "reason": "Relocating to Mombasa"},
+            tests=save("exitId", "j.data.id"),
+            desc="Works out the settlement and sends it for approval by the quorum. Not for your own exit."),
+        req("List exits", "GET", "/api/v1/member-exits",
+            query=[q("status", "PENDING_APPROVAL"), q("memberUserId", "{{memberUserId}}")] + PAGE,
+            tests=save("exitId", "j.data[0].id")),
+        req("My exits", "GET", "/api/v1/member-exits/mine", auth="member"),
+        req("One exit", "GET", "/api/v1/member-exits/{{exitId}}"),
+        req("Approve", "POST", "/api/v1/member-exits/{{exitId}}/approve", {"note": "Agreed at the AGM"},
+            desc="Chairperson or secretary by default (MEMBER_EXIT_APPROVE); not whoever started it, not the member."),
+        req("Reject", "POST", "/api/v1/member-exits/{{exitId}}/reject", {"reason": "Settle the welfare dispute first"}),
+        req("Cancel", "POST", "/api/v1/member-exits/{{exitId}}/cancel", desc="Only whoever started it."),
+        req("Settle (pay out)", "POST", "/api/v1/member-exits/{{exitId}}/settle",
+            {"method": "MPESA", "reference": "QKEXIT{{$timestamp}}", "settledOn": None},
+            desc="Treasurer (MEMBER_EXIT_SETTLE). Clears loans and penalties from savings, moves non-refundable "
+                 "savings to retained surplus, pays out the rest, closes the accounts and ends the membership. "
+                 "Method and reference only when something is paid out."),
+    ], desc="A member leaving the chama. Requests use {{officialToken}}: log in as the right official."),
+
     folder("Contributions", [
         req("Record a contribution", "POST", "/api/v1/contributions", {
             "memberUserId": "{{memberUserId}}", "amountMinor": 500000, "method": "MPESA",
@@ -294,6 +320,11 @@ items = [
             desc="Send as the guarantor (log in as them first)."),
         req("Name another guarantor", "POST", "/api/v1/loans/{{loanId}}/guarantors",
             {"guarantorUserId": "{{guarantorUserId}}"}, auth="member"),
+        req("Transfer a guarantee", "POST", "/api/v1/loans/{{loanId}}/guarantors/{{guarantorUserId}}/replace",
+            {"newGuarantorUserId": "{{memberUserId}}"},
+            desc="Asks another active member to take over {{guarantorUserId}}'s guarantee, e.g. because they are "
+                 "leaving the chama. The borrower, that guarantor or an official with LOAN_APPROVE may ask. The new "
+                 "member answers with 'Answer a guarantee request'; accepting releases the old guarantor."),
         req("Cancel my application", "POST", "/api/v1/loans/{{loanId}}/cancel", auth="member"),
         req("List loans", "GET", "/api/v1/loans",
             query=[q("status", "PENDING_APPROVAL"), q("memberUserId", "{{memberUserId}}")] + PAGE,
@@ -451,7 +482,7 @@ VARIABLES = [
     ("officialToken", ""), ("officialRefreshToken", ""),
     ("memberToken", ""), ("memberRefreshToken", ""),
     ("chamaId", ""), ("membershipId", ""), ("memberUserId", ""), ("guarantorUserId", ""),
-    ("paymentId", ""), ("periodId", ""), ("penaltyId", ""), ("loanId", ""), ("expenseId", ""), ("investmentId", ""), ("accountId", ""), ("entryId", ""),
+    ("paymentId", ""), ("periodId", ""), ("penaltyId", ""), ("loanId", ""), ("expenseId", ""), ("exitId", ""), ("investmentId", ""), ("accountId", ""), ("entryId", ""),
     ("savingsProductId", ""), ("memberAccountId", ""), ("loanProductId", ""),
 ]
 

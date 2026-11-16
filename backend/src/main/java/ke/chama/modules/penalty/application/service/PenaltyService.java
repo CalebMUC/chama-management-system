@@ -150,6 +150,42 @@ public class PenaltyService implements PenaltyUseCases {
         return view(penalty, members.seatedMember(chamaId, penalty.memberUserId()).orElse(null));
     }
 
+    /**
+     * Clears a penalty owed by a member who is leaving from their own savings: debits each savings
+     * account named in {@code sources} (the member's balance there) and credits their "Penalties
+     * receivable". Recorded as a payment with method SAVINGS. Runs in the caller's transaction.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void payFromSavings(UUID chamaId, UUID actorUserId, UUID penaltyId,
+                               List<ke.chama.modules.penalty.api.PenaltyPayments.SavingsSource> sources, LocalDate paidOn) {
+        Penalty penalty = load(chamaId, penaltyId);
+        if (penalty.memberUserId().equals(actorUserId)) {
+            throw new SelfHandlingNotAllowedException();
+        }
+        if (sources.isEmpty() || sources.stream().anyMatch(s -> s.amountMinor() <= 0)) {
+            throw new ke.chama.modules.penalty.domain.exception.PenaltyExceptions.InvalidPenaltyException(
+                    "Each amount taken from savings must be greater than zero");
+        }
+        long total = sources.stream().mapToLong(ke.chama.modules.penalty.api.PenaltyPayments.SavingsSource::amountMinor).sum();
+        PenaltyPayment payment = PenaltyPayment.fromSavings(penalty, total, paidOn, actorUserId, today(), clock.instant());
+        penalty.pay(total);
+        List<PostingLine> lines = new ArrayList<>();
+        for (var source : sources) {
+            lines.add(new PostingLine(null, source.accountCode(), ke.chama.modules.transaction.api.EntrySide.DEBIT,
+                    money(source.amountMinor(), penalty.currency()), penalty.memberUserId(), null));
+        }
+        lines.add(PostingLine.credit(LedgerAccountKey.PENALTIES_RECEIVABLE, money(total, penalty.currency()))
+                .forMember(penalty.memberUserId()));
+        UUID entryId = ledger.post(new PostingRequest(chamaId, payment.paidOn(),
+                "Penalty cleared from savings on leaving the chama: " + penalty.description(), null, SOURCE_PAYMENT,
+                payment.id().toString(), actorUserId, lines));
+        repository.insertPayment(payment.postedAs(entryId));
+        save(penalty);
+        auditTrail.record(AuditEntry.of(chamaId, actorUserId, "PENALTY_PAID", AUDIT_TARGET, penaltyId)
+                .with(Map.of("amountMinor", total, "method", payment.method(),
+                        "outstandingMinor", penalty.outstandingMinor())));
+    }
+
     @Override
     public PenaltyView waive(UUID chamaId, UUID actorUserId, UUID penaltyId, String reason) {
         Penalty penalty = load(chamaId, penaltyId);

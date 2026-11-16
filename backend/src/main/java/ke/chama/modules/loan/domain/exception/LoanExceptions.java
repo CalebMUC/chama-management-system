@@ -60,6 +60,13 @@ public final class LoanExceptions {
         }
     }
 
+    public static class GuaranteeTransferNotAllowedException extends DomainException {
+        public GuaranteeTransferNotAllowedException() {
+            super("LOAN_GUARANTEE_TRANSFER_NOT_ALLOWED", ErrorType.FORBIDDEN,
+                    "Only the borrower, the guarantor being replaced or an official who approves loans can do this");
+        }
+    }
+
     public static class NotTheBorrowerException extends DomainException {
         public NotTheBorrowerException() {
             super("LOAN_NOT_BORROWER", ErrorType.FORBIDDEN, "Only the borrower can do this");

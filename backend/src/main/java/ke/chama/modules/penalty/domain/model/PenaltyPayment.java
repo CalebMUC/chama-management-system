@@ -10,7 +10,8 @@ import java.util.UUID;
 /**
  * A payment towards one penalty, posted to the ledger.
  *
- * @param method CASH, BANK or MPESA; M-Pesa and bank payments carry their reference
+ * @param method CASH, BANK or MPESA; M-Pesa and bank payments carry their reference. SAVINGS when it
+ *               was taken from the member's own savings as they left the chama.
  */
 public record PenaltyPayment(UUID id,
                              UUID chamaId,
@@ -24,6 +25,8 @@ public record PenaltyPayment(UUID id,
                              UUID ledgerEntryId,
                              UUID recordedBy,
                              Instant recordedAt) {
+
+    public static final String SAVINGS = "SAVINGS";
 
     public static PenaltyPayment record(Penalty penalty, long amountMinor, String method, String reference,
                                         LocalDate paidOn, UUID recordedBy, LocalDate today, Instant now) {
@@ -43,6 +46,16 @@ public record PenaltyPayment(UUID id,
         }
         return new PenaltyPayment(UUID.randomUUID(), penalty.chamaId(), penalty.id(), penalty.memberUserId(),
                 amountMinor, penalty.currency(), method, ref, date, null, recordedBy, now);
+    }
+
+    /** Taken from the member's savings when they leave the chama; no external reference. */
+    public static PenaltyPayment fromSavings(Penalty penalty, long amountMinor, LocalDate paidOn, UUID recordedBy,
+                                             LocalDate today, Instant now) {
+        if (paidOn.isAfter(today)) {
+            throw new InvalidPenaltyException("A payment cannot be dated in the future");
+        }
+        return new PenaltyPayment(UUID.randomUUID(), penalty.chamaId(), penalty.id(), penalty.memberUserId(),
+                amountMinor, penalty.currency(), SAVINGS, null, paidOn, null, recordedBy, now);
     }
 
     public PenaltyPayment postedAs(UUID entryId) {

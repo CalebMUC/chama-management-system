@@ -17,6 +17,21 @@ public interface LoanPortfolio {
     int pendingGuaranteeRequests(UUID chamaId, UUID memberUserId);
 
     /**
+     * Loans not yet closed (applied for, approved or being repaid) that the member guarantees or
+     * has been asked to guarantee. A member cannot leave the chama while any remain.
+     */
+    List<HeldGuarantee> guaranteesHeldBy(UUID chamaId, UUID memberUserId);
+
+    /**
+     * @param guarantorStatus      ACCEPTED (they guarantee it) or REQUESTED (they have not answered)
+     * @param loanStatus           PENDING_GUARANTORS, PENDING_APPROVAL, APPROVED or ACTIVE
+     * @param replacementRequested someone else has been asked to take over this guarantee
+     */
+    record HeldGuarantee(UUID loanId, UUID borrowerUserId, String purpose, String loanStatus, String guarantorStatus,
+                         long outstandingMinor, String currency, boolean replacementRequested) {
+    }
+
+    /**
      * One loan today. Amounts are minor units of {@code currency}; owed amounts are zero until it is disbursed.
      *
      * @param status          PENDING_GUARANTORS, PENDING_APPROVAL, APPROVED, ACTIVE, REPAID, REJECTED or CANCELLED
